@@ -2,6 +2,9 @@ package adapters
 
 import (
 	"fmt"
+	"net/url"
+	"os/exec"
+	"strings"
 
 	"database/sql"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -25,15 +28,25 @@ type Database interface {
 }
 
 func (c DbConnection) String(database string) string {
-	return fmt.Sprintf("user=%s password=%s host=%s port=%s database=%s", c.Username, c.Password, c.Host, c.Port, database)
+	if c.Url != "" {
+		u, err := url.Parse(c.Url)
+		if err == nil {
+			c.Username = u.User.Username()
+			c.Password, _ = u.User.Password()
+			c.Host = u.Hostname()
+			c.Port = u.Port()
+		}
+	} else if c.Command != "" {
+		c.collectCredentialsFromCommand()
+	}
+
+	return fmt.Sprintf("user=%s password=%s host=%s port=%s database=%s",
+		c.Username, c.Password, c.Host, c.Port, database)
 }
 
 func (c DbConnection) InitConnection() (Database, error) {
-	err := c.validateConnection()
 	var db *sql.DB
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
 	db, err = sql.Open(c.Driver, c.String("postgres"))
 	if err != nil {
@@ -52,25 +65,18 @@ func (c DbConnection) InitConnection() (Database, error) {
 	return nil, fmt.Errorf("unsupported driver: %s", c.Driver)
 }
 
-func (c DbConnection) validateConnection() error {
-	var errorMessage string
-	if c.Host == "" {
-		errorMessage += "Host is required. "
+func (c *DbConnection) collectCredentialsFromCommand() error {
+	out, err := exec.Command(c.Command).Output()
+	if err != nil {
+		return err
 	}
-	if c.Port == "" {
-		errorMessage += "Port is required. "
+	parts := strings.Split(strings.TrimSpace(string(out)), "\t")
+	if len(parts) != 4 {
+		return fmt.Errorf("invalid command output: expected 4 tab-separated values, got %d", len(parts))
 	}
-	if c.Username == "" {
-		errorMessage += "Username is required. "
-	}
-	if c.Password == "" {
-		errorMessage += "Password is required. "
-	}
-	if c.Driver == "" {
-		errorMessage += "Driver is required. "
-	}
-	if errorMessage != "" {
-		return fmt.Errorf("%s", errorMessage)
-	}
+	c.Host = parts[0]
+	c.Username = parts[1]
+	c.Password = parts[2]
+	c.Port = parts[3]
 	return nil
 }

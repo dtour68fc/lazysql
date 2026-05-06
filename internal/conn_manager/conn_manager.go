@@ -134,7 +134,9 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.layout = utils.ConnectionManagerLayout(msg)
 	}
 
-	m.list, listCmd = m.list.Update(msg)
+	if !m.editingConnection {
+		m.list, listCmd = m.list.Update(msg)
+	}
 	m.form, formCmd = m.form.Update(msg)
 	cmd := tea.Batch(listCmd, formCmd, command)
 	return m, cmd
