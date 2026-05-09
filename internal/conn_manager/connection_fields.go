@@ -60,4 +60,3 @@ func createPasswordInput(value string) textinput.Model {
 	ti.EchoCharacter = '•'
 	return ti
 }
-

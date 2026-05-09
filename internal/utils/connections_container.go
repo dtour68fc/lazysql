@@ -8,6 +8,25 @@ import (
 	"app.lazygit/internal/adapters"
 )
 
+func SaveConnections(connections map[string]adapters.DbConnection) error {
+	connectionsPath, err := getConnectionsFilePath()
+	if err != nil {
+		return err
+	}
+
+	connectionsJson, err := json.MarshalIndent(connections, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(connectionsPath, connectionsJson, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func GetConnections() (map[string]adapters.DbConnection, error) {
 	fileContent, err := readConnectionsFile()
 	if err != nil {

@@ -17,10 +17,10 @@ type ConnectionList struct {
 	layout             utils.ConnectionManagerLayout
 }
 
-func InitConnectionList(connections []adapters.DbConnection, layout utils.ConnectionManagerLayout) ConnectionList {
-	viewport := viewport.New(layout.ConnectionListWidth, layout.BodyHeight - 2)
+func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
+	viewport := viewport.New(layout.ConnectionListWidth, layout.BodyHeight-2)
 	model := ConnectionList{
-		connections:        connections,
+		connections:        []adapters.DbConnection{},
 		selectedConnection: 0,
 		layout:             layout,
 		viewport:           viewport,

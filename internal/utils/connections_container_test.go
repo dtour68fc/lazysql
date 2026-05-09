@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"app.lazygit/internal/adapters"
 )
 
 func TestGetConnections(t *testing.T) {
@@ -59,6 +61,57 @@ func TestGetConnections(t *testing.T) {
 	}
 }
 
+func TestSaveConnections(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	// Call GetConnections first to ensure directory is created, matching app behavior
+	_, _ = GetConnections()
+
+	connections := map[string]adapters.DbConnection{
+		"test-save": {
+			Name: "test-save",
+			Host: "localhost",
+		},
+	}
+
+	err := SaveConnections(connections)
+	if err != nil {
+		t.Fatalf("SaveConnections failed: %v", err)
+	}
+
+	// Verify we can read it back
+	saved, err := GetConnections()
+	if err != nil {
+		t.Fatalf("GetConnections failed: %v", err)
+	}
+
+	if len(saved) != 1 {
+		t.Errorf("Expected 1 connection, got %d", len(saved))
+	}
+
+	if saved["test-save"].Name != "test-save" {
+		t.Errorf("Expected connection name 'test-save', got '%s'", saved["test-save"].Name)
+	}
+}
+
+func TestReadConnectionsFile_OtherError(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	// Create a directory where the file should be to trigger an EISDIR error on ReadFile
+	configPath := filepath.Join(tempDir, "lazysql", "connections.json")
+	err := os.MkdirAll(configPath, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+
+	_, err = GetConnections()
+	if err == nil {
+		t.Error("Expected error when connections.json is a directory, got nil")
+	}
+}
+
 func TestGetConnections_CreateDirFail(t *testing.T) {
 	// Setup a path that should fail to be created
 	// We can't easily mock os.MkdirAll, but we can point it to a read-only directory
@@ -92,5 +145,17 @@ func TestGetConnectionsFilePath(t *testing.T) {
 	expected := filepath.Join(tempDir, "lazysql", "connections.json")
 	if path != expected {
 		t.Errorf("Expected path %s, got %s", expected, path)
+	}
+}
+
+func TestGetConnectionsFilePath_Error(t *testing.T) {
+	// Unset HOME to make os.UserConfigDir fail on Linux
+	home := os.Getenv("HOME")
+	os.Unsetenv("HOME")
+	defer os.Setenv("HOME", home)
+
+	_, err := getConnectionsFilePath()
+	if err == nil {
+		t.Error("Expected error when HOME is unset, got nil")
 	}
 }

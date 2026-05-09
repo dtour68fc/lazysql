@@ -2,8 +2,8 @@ package explorer
 
 import (
 	"fmt"
-	"strings"
 	"github.com/charmbracelet/bubbles/viewport"
+	"strings"
 
 	adapters "app.lazygit/internal/adapters"
 	utils "app.lazygit/internal/utils"
@@ -22,7 +22,7 @@ type ExplorerModel struct {
 	explorerList  utils.ExplorerList
 	layout        utils.ConnectionContainerLayout
 	isActive      bool
-	viewport	   viewport.Model
+	viewport      viewport.Model
 }
 
 func InitExplorer(database adapters.Database, layout utils.ConnectionContainerLayout) ExplorerModel {

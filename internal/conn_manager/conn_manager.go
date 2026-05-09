@@ -2,8 +2,8 @@ package conn_manager
 
 import (
 	"fmt"
-	"os"
 	"maps"
+	"os"
 	"slices"
 
 	"app.lazygit/internal/utils"
@@ -19,7 +19,7 @@ type ConnectionManager struct {
 	list               tea.Model
 	form               tea.Model
 	connections        []adapters.DbConnection
-	connectionsByName    map[string]adapters.DbConnection
+	connectionsByName  map[string]adapters.DbConnection
 	selectedConnection int
 	editingConnection  bool
 	connecting         bool
@@ -108,15 +108,22 @@ func (m ConnectionManager) loadConnections() tea.Cmd {
 func (m ConnectionManager) saveConnection() tea.Cmd {
 	form := m.form.(ConnectionForm)
 	connection := adapters.DbConnection{
-		Name:     form.inputs[0].Value(),
-		Host:     form.inputs[1].Value(),
-		Port:     form.inputs[2].Value(),
-		Username: form.inputs[3].Value(),
-		Password: form.inputs[4].Value(),
+		Driver:   form.inputs[0].Value(),
+		Name:     form.inputs[1].Value(),
+		Host:     form.inputs[2].Value(),
+		Port:     form.inputs[3].Value(),
+		Username: form.inputs[4].Value(),
+		Password: form.inputs[5].Value(),
+		Url:      form.inputs[6].Value(),
+		Command:  form.inputs[7].Value(),
 	}
 	return func() tea.Msg {
-		m.connections = append(m.connections, connection)
-		return SelectedConnectionMsg(connection)
+		m.connectionsByName[connection.Name] = connection
+		err := utils.SaveConnections(m.connectionsByName)
+		if err != nil {
+			return ConnectionErrorMsg(fmt.Sprintf("Failed to save connection: %s", err))
+		}
+		return SavedConnectionsLoaded(m.connectionsByName)
 	}
 }
 
@@ -130,8 +137,8 @@ func InitConnectionManager() ConnectionManager {
 	layout := calculateLayout(width, height)
 	return ConnectionManager{
 		layout:            layout,
-		list:              InitConnectionList(connections, layout),
-		form:              InitConnForm(initializeNewConnection(), layout),
+		list:              InitConnectionList(layout),
+		form:              InitConnForm(layout),
 		connections:       connections,
 		editingConnection: false,
 		connecting:        false,

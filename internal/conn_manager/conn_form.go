@@ -16,22 +16,21 @@ type ConnectionForm struct {
 	layout     utils.ConnectionManagerLayout
 }
 
-func InitConnForm(connection adapters.DbConnection, layout utils.ConnectionManagerLayout) ConnectionForm {
-	inputs := []textinput.Model{
-		createDriverInput(connection.Driver),
-		createNameInput(connection.Name),
-		createHostInput(connection.Host),
-		createPortInput(connection.Port),
-		createUserInput(connection.Username),
-		createPasswordInput(connection.Password),
-		createUrlInput(connection.Url),
-		createCommandInput(connection.Command),
-	}
+func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
 	return ConnectionForm{
-		inputs:     inputs[:],
+		inputs: []textinput.Model{
+			createDriverInput(""),
+			createNameInput(""),
+			createHostInput(""),
+			createPortInput(""),
+			createUserInput(""),
+			createPasswordInput(""),
+			createUrlInput(""),
+			createCommandInput(""),
+		},
 		focusIndex: -1,
 		layout:     layout,
-		mode:       "url",
+		mode:       "credentials",
 	}
 }
 
@@ -55,6 +54,26 @@ func (m ConnectionForm) updateInputs(msg tea.Msg) tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
+}
+
+func (m ConnectionForm) setSelectedConnection(conn adapters.DbConnection) ConnectionForm {
+	m.inputs[0].SetValue(conn.Driver)
+	m.inputs[1].SetValue(conn.Name)
+	m.inputs[2].SetValue(conn.Host)
+	m.inputs[3].SetValue(conn.Port)
+	m.inputs[4].SetValue(conn.Username)
+	m.inputs[5].SetValue(conn.Password)
+	m.inputs[6].SetValue(conn.Url)
+	m.inputs[7].SetValue(conn.Command)
+
+	if conn.Command != "" {
+		m.mode = "command"
+	} else if conn.Url != "" {
+		m.mode = "url"
+	} else {
+		m.mode = "credentials"
+	}
+	return m
 }
 
 func (m ConnectionForm) Init() tea.Cmd {
@@ -86,14 +105,7 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case SelectedConnectionMsg:
 		conn := adapters.DbConnection(msg)
-		m.inputs[0].SetValue(conn.Driver)
-		m.inputs[1].SetValue(conn.Name)
-		m.inputs[2].SetValue(conn.Host)
-		m.inputs[3].SetValue(conn.Port)
-		m.inputs[4].SetValue(conn.Username)
-		m.inputs[5].SetValue(conn.Password)
-		m.inputs[6].SetValue(conn.Url)
-		m.inputs[7].SetValue(conn.Command)
+		m = m.setSelectedConnection(conn)
 	case EditConnectionMsg:
 		canEdit := bool(msg)
 		if canEdit {
@@ -105,6 +117,12 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
+	case ConnectionsLoaded:
+		connections := []adapters.DbConnection(msg)
+		if len(connections) > 0 {
+			conn := connections[0]
+			m = m.setSelectedConnection(conn)
+		}
 	}
 	cmd := m.updateInputs(msg)
 	return m, cmd

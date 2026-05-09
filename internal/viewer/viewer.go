@@ -12,7 +12,7 @@ import (
 type ViewerModel struct {
 	database    adapters.Database
 	selectedRow int
-	table	 utils.Table
+	table       utils.Table
 	layout      utils.ConnectionContainerLayout
 	isActive    bool
 }
@@ -27,7 +27,7 @@ func InitViewer(database adapters.Database, layout utils.ConnectionContainerLayo
 }
 
 func createTableFromData(data [][]string, layout utils.ConnectionContainerLayout) utils.Table {
-	return utils.InitTable(data, layout.ViewerWidth - 2, layout.ViewerHeight - 2)
+	return utils.InitTable(data, layout.ViewerWidth-2, layout.ViewerHeight-2)
 }
 
 func (m ViewerModel) Init() tea.Cmd { return nil }
@@ -45,7 +45,6 @@ func (m ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.table, viewPortCmd = m.table.Update(msg)
 	return m, viewPortCmd
 }
-
 
 func (m ViewerModel) View() string {
 	style := lipgloss.
