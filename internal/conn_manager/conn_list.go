@@ -79,6 +79,9 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.connectionsUI())
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
+	case ConnectionsLoaded:
+		m.connections = []adapters.DbConnection(msg)
+		m.viewport.SetContent(m.connectionsUI())
 	}
 	m.viewport, viewPortCmd = m.viewport.Update(msg)
 	return m, tea.Batch(cmd, viewPortCmd)

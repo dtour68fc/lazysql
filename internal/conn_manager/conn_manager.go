@@ -3,6 +3,8 @@ package conn_manager
 import (
 	"fmt"
 	"os"
+	"maps"
+	"slices"
 
 	"app.lazygit/internal/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -17,6 +19,7 @@ type ConnectionManager struct {
 	list               tea.Model
 	form               tea.Model
 	connections        []adapters.DbConnection
+	connectionsByName    map[string]adapters.DbConnection
 	selectedConnection int
 	editingConnection  bool
 	connecting         bool
@@ -30,6 +33,8 @@ type EditConnectionMsg bool
 type ConnectionErrorMsg string
 type ConnectedMsg adapters.Database
 type LayoutUpdated utils.ConnectionManagerLayout
+type SavedConnectionsLoaded map[string]adapters.DbConnection
+type ConnectionsLoaded []adapters.DbConnection
 
 func initializeNewConnection() adapters.DbConnection {
 	return adapters.DbConnection{
@@ -51,27 +56,6 @@ func calculateLayout(width int, height int) utils.ConnectionManagerLayout {
 func setLayout(width int, height int) tea.Cmd {
 	return func() tea.Msg {
 		return LayoutUpdated(calculateLayout(width, height))
-	}
-}
-
-func InitConnectionManager() ConnectionManager {
-	var connections []adapters.DbConnection
-	connections = append(connections, initializeNewConnection())
-	width, height, err := term.GetSize(int(os.Stdin.Fd()))
-	if err != nil {
-		width = 1
-		height = 1
-	}
-	selectedConnection := connections[0]
-	layout := calculateLayout(width, height)
-	return ConnectionManager{
-		layout:            layout,
-		list:              InitConnectionList(connections, layout),
-		form:              InitConnForm(selectedConnection, layout),
-		connections:       connections,
-		editingConnection: false,
-		connecting:        false,
-		connectionError:   "",
 	}
 }
 
@@ -102,6 +86,25 @@ func (m ConnectionManager) toggleConnectionEdit() tea.Cmd {
 	}
 }
 
+func loadSavedConnections() tea.Cmd {
+	return func() tea.Msg {
+		connections, err := utils.GetConnections()
+		fmt.Printf("Loaded connections: %+v\n", connections)
+		if err != nil {
+			return ConnectionErrorMsg(fmt.Sprintf("Failed to load connections: %s", err))
+		}
+		return SavedConnectionsLoaded(connections)
+	}
+}
+
+func (m ConnectionManager) loadConnections() tea.Cmd {
+	return func() tea.Msg {
+		savedConnections := slices.Collect(maps.Values(m.connectionsByName))
+		connections := append(savedConnections, initializeNewConnection())
+		return ConnectionsLoaded(connections)
+	}
+}
+
 func (m ConnectionManager) saveConnection() tea.Cmd {
 	form := m.form.(ConnectionForm)
 	connection := adapters.DbConnection{
@@ -117,8 +120,27 @@ func (m ConnectionManager) saveConnection() tea.Cmd {
 	}
 }
 
+func InitConnectionManager() ConnectionManager {
+	var connections []adapters.DbConnection
+	width, height, err := term.GetSize(int(os.Stdin.Fd()))
+	if err != nil {
+		width = 1
+		height = 1
+	}
+	layout := calculateLayout(width, height)
+	return ConnectionManager{
+		layout:            layout,
+		list:              InitConnectionList(connections, layout),
+		form:              InitConnForm(initializeNewConnection(), layout),
+		connections:       connections,
+		editingConnection: false,
+		connecting:        false,
+		connectionError:   "",
+	}
+}
+
 func (m ConnectionManager) Init() tea.Cmd {
-	return tea.Batch(m.list.Init(), m.form.Init())
+	return tea.Batch(m.list.Init(), m.form.Init(), loadSavedConnections())
 }
 
 func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -132,6 +154,9 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.connecting = false
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
+	case SavedConnectionsLoaded:
+		m.connectionsByName = map[string]adapters.DbConnection(msg)
+		command = m.loadConnections()
 	}
 
 	if !m.editingConnection {
@@ -140,6 +165,33 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.form, formCmd = m.form.Update(msg)
 	cmd := tea.Batch(listCmd, formCmd, command)
 	return m, cmd
+}
+
+func (m ConnectionManager) View() string {
+	header := lipgloss.NewStyle().Width(m.layout.WinWidth).Height(m.layout.HeaderHeight).Padding(1).Render("Connection Manager")
+	footer := m.buildFooter()
+
+	listView := m.list.View()
+	formView := m.form.View()
+	listAndFormView := lipgloss.JoinHorizontal(lipgloss.Top, listView, formView)
+	body := lipgloss.NewStyle().
+		Width(m.layout.WinWidth).
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		Height(m.layout.BodyHeight).
+		Render(listAndFormView)
+
+	container := utils.Border().Width(m.layout.WinWidth).Height(m.layout.WinHeight).Render(
+		lipgloss.JoinVertical(lipgloss.Top, header, body, footer),
+	)
+
+	base := lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, container)
+
+	if m.showHelp {
+		helpView := m.renderHelp()
+		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, helpView)
+	}
+
+	return base
 }
 
 func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager, tea.Cmd) {
@@ -180,33 +232,6 @@ func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager
 	}
 
 	return m, command
-}
-
-func (m ConnectionManager) View() string {
-	header := lipgloss.NewStyle().Width(m.layout.WinWidth).Height(m.layout.HeaderHeight).Padding(1).Render("Connection Manager")
-	footer := m.buildFooter()
-
-	listView := m.list.View()
-	formView := m.form.View()
-	listAndFormView := lipgloss.JoinHorizontal(lipgloss.Top, listView, formView)
-	body := lipgloss.NewStyle().
-		Width(m.layout.WinWidth).
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		Height(m.layout.BodyHeight).
-		Render(listAndFormView)
-
-	container := utils.Border().Width(m.layout.WinWidth).Height(m.layout.WinHeight).Render(
-		lipgloss.JoinVertical(lipgloss.Top, header, body, footer),
-	)
-
-	base := lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, container)
-
-	if m.showHelp {
-		helpView := m.renderHelp()
-		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, helpView)
-	}
-
-	return base
 }
 
 func (m ConnectionManager) renderHelp() string {
