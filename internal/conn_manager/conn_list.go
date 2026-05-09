@@ -36,7 +36,7 @@ func (m ConnectionList) changeSelectedConnection() tea.Cmd {
 }
 
 func (m ConnectionList) connectionsUI() string {
-	var result string
+	var connectionsList []string
 	normalStyle := lipgloss.NewStyle().
 		Padding(0, 2)
 	selectedStyle := lipgloss.NewStyle().
@@ -46,12 +46,12 @@ func (m ConnectionList) connectionsUI() string {
 
 	for i, conn := range m.connections {
 		if i == m.selectedConnection {
-			result += selectedStyle.Render(conn.Name) + "\n"
+			connectionsList = append(connectionsList, selectedStyle.Render(conn.Name))
 		} else {
-			result += normalStyle.Render(conn.Name) + "\n"
+			connectionsList = append(connectionsList, normalStyle.Render(conn.Name))
 		}
 	}
-	return result
+	return lipgloss.JoinVertical(lipgloss.Left, connectionsList...)
 }
 
 func (m ConnectionList) Init() tea.Cmd {
