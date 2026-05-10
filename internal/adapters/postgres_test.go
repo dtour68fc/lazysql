@@ -45,7 +45,7 @@ func TestPostgresGetTables(t *testing.T) {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
 	postgres := database.(Postgres)
-	result, err := postgres.GetTables("postgres")
+	result, err := postgres.GetTables("lazysql_test_db")
 	if err != nil {
 		t.Fatalf("Failed to get tables: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestPostgresGetTableItem(t *testing.T) {
 	}
 	defer adminDB.Close()
 
-	adminDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", testDBName))
+	adminDB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", testDBName))
 	if _, err := adminDB.Exec(fmt.Sprintf("CREATE DATABASE %s", testDBName)); err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}

@@ -14,7 +14,7 @@ func TestGetConnections(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	// Test Case 1: File doesn't exist
-	connections, err := GetConnections()
+	connections, err := getConnections()
 	if err != nil {
 		t.Fatalf("Expected no error when file doesn't exist, got %v", err)
 	}
@@ -30,7 +30,7 @@ func TestGetConnections(t *testing.T) {
 
 	// Test Case 2: File exists with connections
 	// We need to write to the file manually to test reading it back
-	// but wait, we don't have a SaveConnections function in utils yet.
+	// but wait, we don't have a saveConnections function in utils yet.
 	// So we'll just write it directly.
 	content := `{"test": {"Name": "test", "Host": "localhost"}}`
 	err = os.WriteFile(configPath, []byte(content), 0644)
@@ -38,7 +38,7 @@ func TestGetConnections(t *testing.T) {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	connections, err = GetConnections()
+	connections, err = getConnections()
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -55,7 +55,7 @@ func TestGetConnections(t *testing.T) {
 		t.Fatalf("Failed to write invalid test file: %v", err)
 	}
 
-	_, err = GetConnections()
+	_, err = getConnections()
 	if err == nil {
 		t.Error("Expected error for invalid JSON, got nil")
 	}
@@ -65,8 +65,8 @@ func TestSaveConnections(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
-	// Call GetConnections first to ensure directory is created, matching app behavior
-	_, _ = GetConnections()
+	// Call getConnections first to ensure directory is created, matching app behavior
+	_, _ = getConnections()
 
 	connections := map[string]adapters.DbConnection{
 		"test-save": {
@@ -75,15 +75,15 @@ func TestSaveConnections(t *testing.T) {
 		},
 	}
 
-	err := SaveConnections(connections)
+	err := saveConnections(connections)
 	if err != nil {
-		t.Fatalf("SaveConnections failed: %v", err)
+		t.Fatalf("saveConnections failed: %v", err)
 	}
 
 	// Verify we can read it back
-	saved, err := GetConnections()
+	saved, err := getConnections()
 	if err != nil {
-		t.Fatalf("GetConnections failed: %v", err)
+		t.Fatalf("getConnections failed: %v", err)
 	}
 
 	if len(saved) != 1 {
@@ -106,7 +106,7 @@ func TestReadConnectionsFile_OtherError(t *testing.T) {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
 
-	_, err = GetConnections()
+	_, err = getConnections()
 	if err == nil {
 		t.Error("Expected error when connections.json is a directory, got nil")
 	}
@@ -122,12 +122,12 @@ func TestGetConnections_CreateDirFail(t *testing.T) {
 		t.Fatalf("Failed to create read-only dir: %v", err)
 	}
 
-	// We want GetConnections to try and create a subdir in readOnlyDir
+	// We want getConnections to try and create a subdir in readOnlyDir
 	// getConnectionsFilePath returns userConfigDir + "/lazysql/connections.json"
 	// if we set XDG_CONFIG_HOME to readOnlyDir, it will try to create readOnlyDir/lazysql
 	t.Setenv("XDG_CONFIG_HOME", readOnlyDir)
 
-	_, err = GetConnections()
+	_, err = getConnections()
 	if err == nil {
 		t.Error("Expected error when directory creation fails, got nil")
 	}
