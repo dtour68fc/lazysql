@@ -10,10 +10,11 @@ import (
 )
 
 type ConnectionForm struct {
-	inputs     []textinput.Model
-	mode       string
-	focusIndex int
-	layout     utils.ConnectionManagerLayout
+	inputs      []textinput.Model
+	mode        string
+	focusIndex  int
+	layout      utils.ConnectionManagerLayout
+	connections []adapters.DbConnection
 }
 
 func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
@@ -28,9 +29,10 @@ func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
 			createUrlInput(""),
 			createCommandInput(""),
 		},
-		focusIndex: -1,
-		layout:     layout,
-		mode:       "credentials",
+		focusIndex:  -1,
+		layout:      layout,
+		mode:        "credentials",
+		connections: []adapters.DbConnection{},
 	}
 }
 
@@ -104,8 +106,11 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case SelectedConnectionMsg:
-		conn := adapters.DbConnection(msg)
-		m = m.setSelectedConnection(conn)
+		index := int(msg)
+		if index > -1 && index <= len(m.connections) {
+			conn := m.connections[index]
+			m = m.setSelectedConnection(conn)
+		}
 	case EditConnectionMsg:
 		canEdit := bool(msg)
 		if canEdit {
@@ -119,6 +124,7 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.layout = utils.ConnectionManagerLayout(msg)
 	case ConnectionsLoaded:
 		connections := []adapters.DbConnection(msg)
+		m.connections = connections
 		if len(connections) > 0 {
 			conn := connections[0]
 			m = m.setSelectedConnection(conn)

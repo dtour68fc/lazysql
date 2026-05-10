@@ -12,7 +12,7 @@ import (
 
 type ConnectionList struct {
 	connections        []adapters.DbConnection
-	selectedConnection int
+	selectedConnectionIndex int
 	viewport           viewport.Model
 	layout             utils.ConnectionManagerLayout
 }
@@ -21,7 +21,7 @@ func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
 	viewport := viewport.New(layout.ConnectionListWidth, layout.BodyHeight-2)
 	model := ConnectionList{
 		connections:        []adapters.DbConnection{},
-		selectedConnection: 0,
+		selectedConnectionIndex: 0,
 		layout:             layout,
 		viewport:           viewport,
 	}
@@ -29,9 +29,9 @@ func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
 	return model
 }
 
-func (m ConnectionList) changeSelectedConnection() tea.Cmd {
+func (m ConnectionList) changeSelectedConnection(index int) tea.Cmd {
 	return func() tea.Msg {
-		return SelectedConnectionMsg(m.connections[m.selectedConnection])
+		return SelectedConnectionMsg(index)
 	}
 }
 
@@ -45,7 +45,7 @@ func (m ConnectionList) connectionsUI() string {
 		Padding(0, 2)
 
 	for i, conn := range m.connections {
-		if i == m.selectedConnection {
+		if i == m.selectedConnectionIndex {
 			connectionsList = append(connectionsList, selectedStyle.Render(conn.Name))
 		} else {
 			connectionsList = append(connectionsList, normalStyle.Render(conn.Name))
@@ -65,15 +65,15 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
-			if m.selectedConnection > 0 {
-				m.selectedConnection--
+			if m.selectedConnectionIndex > 0 {
+				m.selectedConnectionIndex--
 			}
-			cmd = m.changeSelectedConnection()
+			cmd = m.changeSelectedConnection(m.selectedConnectionIndex)
 		case "down", "j":
-			if m.selectedConnection < len(m.connections)-1 {
-				m.selectedConnection++
+			if m.selectedConnectionIndex < len(m.connections)-1 {
+				m.selectedConnectionIndex++
 			}
-			cmd = m.changeSelectedConnection()
+			cmd = m.changeSelectedConnection(m.selectedConnectionIndex)
 		}
 	case SelectedConnectionMsg:
 		m.viewport.SetContent(m.connectionsUI())

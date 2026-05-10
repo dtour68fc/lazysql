@@ -20,7 +20,7 @@ type ConnectionManager struct {
 	form               tea.Model
 	connections        []adapters.DbConnection
 	connectionsByName  map[string]adapters.DbConnection
-	selectedConnection int
+	selectedConnectionIndex int
 	editingConnection  bool
 	connecting         bool
 	savingConnection   bool
@@ -28,7 +28,7 @@ type ConnectionManager struct {
 	connectionError    string
 }
 
-type SelectedConnectionMsg adapters.DbConnection
+type SelectedConnectionMsg int
 type EditConnectionMsg bool
 type ConnectionErrorMsg string
 type ConnectedMsg adapters.Database
@@ -83,6 +83,8 @@ func (m ConnectionManager) saveConnection() tea.Cmd {
 	form := m.form.(ConnectionForm)
 	connection := form.toDbConnection()
 	return func() tea.Msg {
+		currentConnection := m.connections[m.selectedConnectionIndex]
+		delete(m.connectionsByName, currentConnection.Name)
 		m.connectionsByName[connection.Name] = connection
 		err := saveConnections(m.connectionsByName)
 		if err != nil {
@@ -108,6 +110,7 @@ func InitConnectionManager() ConnectionManager {
 		editingConnection: false,
 		connecting:        false,
 		connectionError:   "",
+		selectedConnectionIndex: 0,
 	}
 }
 
@@ -129,6 +132,8 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SavedConnectionsLoaded:
 		m.connectionsByName = map[string]adapters.DbConnection(msg)
 		command = m.loadConnections()
+	case SelectedConnectionMsg:
+		m.selectedConnectionIndex = int(msg)
 	}
 
 	if !m.editingConnection {
