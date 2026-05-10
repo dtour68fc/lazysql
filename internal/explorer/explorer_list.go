@@ -1,4 +1,4 @@
-package utils
+package explorer
 
 type ExplorerNode struct {
 	Title    string

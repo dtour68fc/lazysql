@@ -19,14 +19,14 @@ type TableLoaded []string
 type ExplorerModel struct {
 	database      adapters.Database
 	databaseError string
-	explorerList  utils.ExplorerList
+	explorerList  ExplorerList
 	layout        utils.ConnectionContainerLayout
 	isActive      bool
 	viewport      viewport.Model
 }
 
 func InitExplorer(database adapters.Database, layout utils.ConnectionContainerLayout) ExplorerModel {
-	list := utils.ExplorerList{}
+	list := ExplorerList{}
 	viewport := viewport.New(layout.ExplorerWidth-4, layout.ExplorerHeight-4)
 	list.Initialize()
 	return ExplorerModel{
@@ -75,10 +75,10 @@ func (m ExplorerModel) expandSelectedNode() tea.Cmd {
 	}
 }
 
-func (m ExplorerModel) createDatabaseList(databases []string) utils.ExplorerList {
-	var nodes []utils.ExplorerNode
+func (m ExplorerModel) createDatabaseList(databases []string) ExplorerList {
+	var nodes []ExplorerNode
 	for _, db := range databases {
-		nodes = append(nodes, utils.ExplorerNode{Title: db, Type: "database"})
+		nodes = append(nodes, ExplorerNode{Title: db, Type: "database"})
 	}
 	m.explorerList.Expand(nodes)
 	return m.explorerList
@@ -100,16 +100,16 @@ func (m ExplorerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.explorerList = m.createDatabaseList([]string(msg))
 	case TablesLoaded:
 		m.databaseError = ""
-		var nodes []utils.ExplorerNode
+		var nodes []ExplorerNode
 		for _, table := range msg {
-			nodes = append(nodes, utils.ExplorerNode{Title: table, Type: "table"})
+			nodes = append(nodes, ExplorerNode{Title: table, Type: "table"})
 		}
 		m.explorerList.Expand(nodes)
 	case TableLoaded:
 		m.databaseError = ""
-		var nodes []utils.ExplorerNode
+		var nodes []ExplorerNode
 		for _, item := range msg {
-			nodes = append(nodes, utils.ExplorerNode{Title: item, Type: "table_item"})
+			nodes = append(nodes, ExplorerNode{Title: item, Type: "table_item"})
 		}
 		m.explorerList.Expand(nodes)
 	case utils.ActiveViewChanged:
@@ -164,7 +164,7 @@ func (m ExplorerModel) View() string {
 	return style.Render(fmt.Sprintf("%s\n%s", m.viewport.View(), m.databaseError))
 }
 
-func (m ExplorerModel) ListNode(node *utils.ExplorerNode, indent int) string {
+func (m ExplorerModel) ListNode(node *ExplorerNode, indent int) string {
 	prefix := strings.Repeat("  ", indent)
 	var newIndent int
 	var result string

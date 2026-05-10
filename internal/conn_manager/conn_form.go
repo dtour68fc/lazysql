@@ -191,3 +191,16 @@ func (m ConnectionForm) changeFocusIndex(key string) int {
 	}
 	return m.focusIndex
 }
+
+func (m ConnectionForm) toDbConnection() adapters.DbConnection {
+	return adapters.DbConnection{
+		Driver:   m.inputs[0].Value(),
+		Name:     m.inputs[1].Value(),
+		Host:     m.inputs[2].Value(),
+		Port:     m.inputs[3].Value(),
+		Username: m.inputs[4].Value(),
+		Password: m.inputs[5].Value(),
+		Url:      m.inputs[6].Value(),
+		Command:  m.inputs[7].Value(),
+	}
+}

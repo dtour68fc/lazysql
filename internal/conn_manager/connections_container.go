@@ -1,4 +1,4 @@
-package utils
+package conn_manager
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"app.lazygit/internal/adapters"
 )
 
-func SaveConnections(connections map[string]adapters.DbConnection) error {
+func saveConnections(connections map[string]adapters.DbConnection) error {
 	connectionsPath, err := getConnectionsFilePath()
 	if err != nil {
 		return err
@@ -27,7 +27,20 @@ func SaveConnections(connections map[string]adapters.DbConnection) error {
 	return nil
 }
 
-func GetConnections() (map[string]adapters.DbConnection, error) {
+func initializeNewConnection() adapters.DbConnection {
+	return adapters.DbConnection{
+		Name:     "New Connection",
+		Host:     "",
+		Port:     "",
+		Username: "",
+		Password: "",
+		Driver:   "",
+		Command:  "",
+		Url:      "",
+	}
+}
+
+func getConnections() (map[string]adapters.DbConnection, error) {
 	fileContent, err := readConnectionsFile()
 	if err != nil {
 		return nil, err

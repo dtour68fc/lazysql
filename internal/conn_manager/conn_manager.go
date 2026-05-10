@@ -36,19 +36,6 @@ type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
 type ConnectionsLoaded []adapters.DbConnection
 
-func initializeNewConnection() adapters.DbConnection {
-	return adapters.DbConnection{
-		Name:     "New Connection",
-		Host:     "",
-		Port:     "",
-		Username: "",
-		Password: "",
-		Driver:   "",
-		Command:  "",
-		Url:      "",
-	}
-}
-
 func calculateLayout(width int, height int) utils.ConnectionManagerLayout {
 	return utils.CalculateConnectionManagerLayout(width, height)
 }
@@ -61,16 +48,7 @@ func setLayout(width int, height int) tea.Cmd {
 
 func (m ConnectionManager) establishConnection() tea.Cmd {
 	form := m.form.(ConnectionForm)
-	connection := adapters.DbConnection{
-		Driver:   form.inputs[0].Value(),
-		Name:     form.inputs[1].Value(),
-		Host:     form.inputs[2].Value(),
-		Port:     form.inputs[3].Value(),
-		Username: form.inputs[4].Value(),
-		Password: form.inputs[5].Value(),
-		Url:      form.inputs[6].Value(),
-		Command:  form.inputs[7].Value(),
-	}
+	connection := form.toDbConnection()
 	return func() tea.Msg {
 		database, err := connection.InitConnection()
 		if err != nil {
@@ -88,7 +66,7 @@ func (m ConnectionManager) toggleConnectionEdit() tea.Cmd {
 
 func loadSavedConnections() tea.Cmd {
 	return func() tea.Msg {
-		connections, err := utils.GetConnections()
+		connections, err := getConnections()
 		fmt.Printf("Loaded connections: %+v\n", connections)
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to load connections: %s", err))
@@ -107,19 +85,10 @@ func (m ConnectionManager) loadConnections() tea.Cmd {
 
 func (m ConnectionManager) saveConnection() tea.Cmd {
 	form := m.form.(ConnectionForm)
-	connection := adapters.DbConnection{
-		Driver:   form.inputs[0].Value(),
-		Name:     form.inputs[1].Value(),
-		Host:     form.inputs[2].Value(),
-		Port:     form.inputs[3].Value(),
-		Username: form.inputs[4].Value(),
-		Password: form.inputs[5].Value(),
-		Url:      form.inputs[6].Value(),
-		Command:  form.inputs[7].Value(),
-	}
+	connection := form.toDbConnection()
 	return func() tea.Msg {
 		m.connectionsByName[connection.Name] = connection
-		err := utils.SaveConnections(m.connectionsByName)
+		err := saveConnections(m.connectionsByName)
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to save connection: %s", err))
 		}
@@ -268,31 +237,4 @@ func (m ConnectionManager) buildFooter() string {
 		footerContent = normalFooter()
 	}
 	return lipgloss.NewStyle().Width(m.layout.WinWidth).Height(m.layout.FooterHeight).Padding(1).Render(fmt.Sprintf("%s", footerContent))
-}
-
-func editFooter() string {
-	return fmt.Sprintf("%s, %s",
-		"Cancel (esc)",
-		"Navigate (tab, shift+tab)",
-	)
-}
-
-func normalFooter() string {
-	return fmt.Sprintf("%s, %s, %s, %s, %s, %s",
-		"Connect (enter)",
-		"Edit (e)",
-		"Save (s)",
-		"Navigate (j,k)",
-		"Change Mode (m)",
-		"Help (?)",
-	)
-}
-
-func errorFooter(errorMessage string) string {
-	error_message := lipgloss.NewStyle().Foreground(lipgloss.Color("161")).Render(errorMessage)
-	return fmt.Sprintf("%s\n%s", error_message, "Press 'e' to edit connection details.")
-}
-
-func connectingFooter() string {
-	return "Connecting..."
 }
