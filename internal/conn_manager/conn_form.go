@@ -14,7 +14,7 @@ type ConnectionForm struct {
 	mode        string
 	focusIndex  int
 	layout      utils.ConnectionManagerLayout
-	connections []adapters.DbConnection
+	connections map[string]adapters.DbConnection
 }
 
 func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
@@ -29,10 +29,9 @@ func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
 			createUrlInput(""),
 			createCommandInput(""),
 		},
-		focusIndex:  -1,
-		layout:      layout,
-		mode:        "credentials",
-		connections: []adapters.DbConnection{},
+		focusIndex: -1,
+		layout:     layout,
+		mode:       "credentials",
 	}
 }
 
@@ -106,11 +105,8 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case SelectedConnectionMsg:
-		index := int(msg)
-		if index > -1 && index <= len(m.connections) {
-			conn := m.connections[index]
-			m = m.setSelectedConnection(conn)
-		}
+		conn := adapters.DbConnection(msg)
+		m = m.setSelectedConnection(conn)
 	case EditConnectionMsg:
 		canEdit := bool(msg)
 		if canEdit {
@@ -122,13 +118,9 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
-	case ConnectionsLoaded:
-		connections := []adapters.DbConnection(msg)
+	case SavedConnectionsLoaded:
+		connections := map[string]adapters.DbConnection(msg)
 		m.connections = connections
-		if len(connections) > 0 {
-			conn := connections[0]
-			m = m.setSelectedConnection(conn)
-		}
 	}
 	cmd := m.updateInputs(msg)
 	return m, cmd

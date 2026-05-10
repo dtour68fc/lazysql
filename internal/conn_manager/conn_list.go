@@ -11,19 +11,19 @@ import (
 )
 
 type ConnectionList struct {
-	connections        []adapters.DbConnection
+	connections             []adapters.DbConnection
 	selectedConnectionIndex int
-	viewport           viewport.Model
-	layout             utils.ConnectionManagerLayout
+	viewport                viewport.Model
+	layout                  utils.ConnectionManagerLayout
 }
 
 func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
 	viewport := viewport.New(layout.ConnectionListWidth, layout.BodyHeight-2)
 	model := ConnectionList{
-		connections:        []adapters.DbConnection{},
+		connections:             []adapters.DbConnection{},
 		selectedConnectionIndex: 0,
-		layout:             layout,
-		viewport:           viewport,
+		layout:                  layout,
+		viewport:                viewport,
 	}
 	model.viewport.SetContent(model.connectionsUI())
 	return model
@@ -31,7 +31,7 @@ func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
 
 func (m ConnectionList) changeSelectedConnection(index int) tea.Cmd {
 	return func() tea.Msg {
-		return SelectedConnectionMsg(index)
+		return SelectedConnectionMsg(m.connections[index])
 	}
 }
 
@@ -82,6 +82,7 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ConnectionsLoaded:
 		m.connections = []adapters.DbConnection(msg)
 		m.viewport.SetContent(m.connectionsUI())
+		cmd = m.changeSelectedConnection(m.selectedConnectionIndex)
 	}
 	m.viewport, viewPortCmd = m.viewport.Update(msg)
 	return m, tea.Batch(cmd, viewPortCmd)
