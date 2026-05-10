@@ -36,13 +36,9 @@ type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
 type ConnectionsLoaded []adapters.DbConnection
 
-func calculateLayout(width int, height int) utils.ConnectionManagerLayout {
-	return utils.CalculateConnectionManagerLayout(width, height)
-}
-
 func setLayout(width int, height int) tea.Cmd {
 	return func() tea.Msg {
-		return LayoutUpdated(calculateLayout(width, height))
+		return LayoutUpdated(utils.CalculateConnectionManagerLayout(width, height))
 	}
 }
 
@@ -103,7 +99,7 @@ func InitConnectionManager() ConnectionManager {
 		width = 1
 		height = 1
 	}
-	layout := calculateLayout(width, height)
+	layout := utils.CalculateConnectionManagerLayout(width, height)
 	return ConnectionManager{
 		layout:            layout,
 		list:              InitConnectionList(layout),
@@ -163,7 +159,7 @@ func (m ConnectionManager) View() string {
 	base := lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, container)
 
 	if m.showHelp {
-		helpView := m.renderHelp()
+		helpView := renderHelp(m.layout.HelpWidth, m.layout.HelpHeight)
 		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, helpView)
 	}
 
@@ -208,21 +204,6 @@ func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager
 	}
 
 	return m, command
-}
-
-func (m ConnectionManager) renderHelp() string {
-	helpText := `Connection Manager Help
-- Name is for connection name that will appear in the list
-- Driver is used to establish and find the database server, user
- * pgx for PostgreSQL
-- Quit this dialog by hitting "?" or "esc"
-	`
-	return lipgloss.NewStyle().
-		Width(m.layout.HelpWidth).
-		Height(m.layout.HelpHeight).
-		Padding(1).
-		Border(lipgloss.NormalBorder()).
-		Render(helpText)
 }
 
 func (m ConnectionManager) buildFooter() string {
