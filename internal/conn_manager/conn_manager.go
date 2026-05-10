@@ -15,17 +15,17 @@ import (
 )
 
 type ConnectionManager struct {
-	layout             utils.ConnectionManagerLayout
-	list               tea.Model
-	form               tea.Model
-	connections        []adapters.DbConnection
-	connectionsByName  map[string]adapters.DbConnection
+	layout                  utils.ConnectionManagerLayout
+	list                    tea.Model
+	form                    tea.Model
+	connections             []adapters.DbConnection
+	connectionsByName       map[string]adapters.DbConnection
 	selectedConnectionIndex int
-	editingConnection  bool
-	connecting         bool
-	savingConnection   bool
-	showHelp           bool
-	connectionError    string
+	editingConnection       bool
+	connecting              bool
+	savingConnection        bool
+	showHelp                bool
+	connectionError         string
 }
 
 type SelectedConnectionMsg int
@@ -82,11 +82,13 @@ func (m ConnectionManager) loadConnections() tea.Cmd {
 func (m ConnectionManager) saveConnection() tea.Cmd {
 	form := m.form.(ConnectionForm)
 	connection := form.toDbConnection()
-	return func() tea.Msg {
-		currentConnection := m.connections[m.selectedConnectionIndex]
-		delete(m.connectionsByName, currentConnection.Name)
+		if m.selectedConnectionIndex >= len(m.connections) {
+			currentConnection := m.connections[m.selectedConnectionIndex]
+			delete(m.connectionsByName, currentConnection.Name)
+		}
 		m.connectionsByName[connection.Name] = connection
 		err := saveConnections(m.connectionsByName)
+	return func() tea.Msg {
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to save connection: %s", err))
 		}
@@ -103,13 +105,13 @@ func InitConnectionManager() ConnectionManager {
 	}
 	layout := utils.CalculateConnectionManagerLayout(width, height)
 	return ConnectionManager{
-		layout:            layout,
-		list:              InitConnectionList(layout),
-		form:              InitConnForm(layout),
-		connections:       connections,
-		editingConnection: false,
-		connecting:        false,
-		connectionError:   "",
+		layout:                  layout,
+		list:                    InitConnectionList(layout),
+		form:                    InitConnForm(layout),
+		connections:             connections,
+		editingConnection:       false,
+		connecting:              false,
+		connectionError:         "",
 		selectedConnectionIndex: 0,
 	}
 }
