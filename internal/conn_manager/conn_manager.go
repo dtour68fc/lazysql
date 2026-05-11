@@ -80,14 +80,14 @@ func (m ConnectionManager) loadConnections() tea.Cmd {
 }
 
 func (m ConnectionManager) saveConnection() tea.Cmd {
-	form := m.form.(ConnectionForm)
-	connection := form.toDbConnection()
-	if conn, exists := m.connectionsByName[m.selectedConnectionName]; exists {
-		delete(m.connectionsByName, conn.Name)
-	}
-	m.connectionsByName[connection.Name] = connection
-	err := saveConnections(m.connectionsByName)
 	return func() tea.Msg {
+		form := m.form.(ConnectionForm)
+		connection := form.toDbConnection()
+		if conn, exists := m.connectionsByName[m.selectedConnectionName]; exists {
+			delete(m.connectionsByName, conn.Name)
+		}
+		m.connectionsByName[connection.Name] = connection
+		err := saveConnections(m.connectionsByName)
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to save connection: %s", err))
 		}
