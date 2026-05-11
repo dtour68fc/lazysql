@@ -17,38 +17,20 @@ type EditorModel struct {
 }
 
 func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayout) EditorModel {
-	lineNumberStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888888")).
-		Background(lipgloss.Color("#222222")).
-		PaddingRight(1)
-
-	currentLineStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("white")).
-		Background(lipgloss.Color("#444444")).
-		Bold(true).
-		PaddingRight(1)
-
-	cursorStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#CC8800")).
-		Foreground(lipgloss.Color("black"))
 	return EditorModel{
 		database: database,
 		layout:   layout,
 		isActive: false,
 		editor: vimtea.NewEditor(
-			vimtea.WithLineNumberStyle(lineNumberStyle),
-			vimtea.WithCurrentLineNumberStyle(currentLineStyle),
-			vimtea.WithCursorStyle(cursorStyle),
-			vimtea.WithRelativeNumbers(true),
-			vimtea.WithContent("Initial content"),
 			vimtea.WithEnableStatusBar(true),
-			vimtea.WithDefaultSyntaxTheme("catppuccin-macchiato"),
 		),
 	}
 }
 
 func (m EditorModel) Init() tea.Cmd {
-	return m.editor.Init()
+	newEditor, cmd := m.editor.SetSize(m.layout.EditorWidth-2, m.layout.EditorHeight-2)
+	m.editor = newEditor.(vimtea.Editor)
+	return tea.Batch(m.editor.Init(), cmd)
 }
 
 func (m EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
