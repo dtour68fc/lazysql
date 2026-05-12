@@ -15,6 +15,7 @@ type ViewerModel struct {
 	table       utils.Table
 	layout      utils.ConnectionContainerLayout
 	isActive    bool
+	content string
 }
 
 func InitViewer(database adapters.Database, layout utils.ConnectionContainerLayout) ViewerModel {
@@ -23,6 +24,7 @@ func InitViewer(database adapters.Database, layout utils.ConnectionContainerLayo
 		layout:   layout,
 		isActive: false,
 		table:    utils.InitTable([][]string{}, layout.ViewerWidth, layout.ViewerHeight),
+		content: "",
 	}
 }
 
@@ -35,6 +37,8 @@ func (m ViewerModel) Init() tea.Cmd { return nil }
 func (m ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var viewPortCmd tea.Cmd
 	switch msg := msg.(type) {
+	case utils.ViewerStringData:
+		m.content = string(msg)
 	case utils.ViewerTableData:
 		m.table = createTableFromData(msg, m.layout)
 	case utils.ActiveViewChanged:
@@ -60,7 +64,7 @@ func (m ViewerModel) View() string {
 	if m.table.HasData() {
 		content = fmt.Sprintf("%s\n", m.table.View())
 	} else {
-		content = "Welcome to LazyGit Viewer!\n\nPress q to quit."
+		content = m.content
 	}
 	return style.Render(content)
 }

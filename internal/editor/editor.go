@@ -17,13 +17,24 @@ type EditorModel struct {
 }
 
 func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayout) EditorModel {
+	editor := vimtea.NewEditor(
+		vimtea.WithEnableStatusBar(true),
+	)
+	editor.AddBinding(vimtea.KeyBinding{
+		Key:         "ctrl+r",
+		Mode:        vimtea.ModeVisual,
+		Description: "Run the selected query",
+		Handler: func(buf vimtea.Buffer) tea.Cmd {
+			return func() tea.Msg {
+				return utils.ViewerStringData(buf.Text())
+			}
+		},
+	})
 	return EditorModel{
 		database: database,
 		layout:   layout,
 		isActive: false,
-		editor: vimtea.NewEditor(
-			vimtea.WithEnableStatusBar(true),
-		),
+		editor:   editor,
 	}
 }
 

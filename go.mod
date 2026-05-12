@@ -36,7 +36,13 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.29.0 // indirect
+	golang.design/x/clipboard v0.7.0 // indirect
+	golang.org/x/exp/shiny v0.0.0-20260508232706-74f9aab9d74a // indirect
+	golang.org/x/image v0.40.0 // indirect
+	golang.org/x/mobile v0.0.0-20260410095206-2cfb76559b7b // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )
+
+replace github.com/kujtimiihoxha/vimtea => /home/umair/dev/vimtea

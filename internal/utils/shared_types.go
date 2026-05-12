@@ -1,6 +1,7 @@
 package utils
 
 type ViewerTableData [][]string
+type ViewerStringData string
 type ActiveViewChanged string
 type LayoutUpdated ConnectionContainerLayout
 
