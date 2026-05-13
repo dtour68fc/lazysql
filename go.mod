@@ -45,4 +45,4 @@ require (
 	golang.org/x/text v0.37.0 // indirect
 )
 
-replace github.com/kujtimiihoxha/vimtea => /home/umair/dev/vimtea
+replace github.com/kujtimiihoxha/vimtea => github.com/umairabid/vimtea v0.0.0-20260513051415-017b35f4f470

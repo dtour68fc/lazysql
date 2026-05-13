@@ -26,7 +26,12 @@ func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayo
 		Description: "Run the selected query",
 		Handler: func(buf vimtea.Buffer) tea.Cmd {
 			return func() tea.Msg {
-				return utils.ViewerStringData(buf.Text())
+				return nil
+			}
+		},
+		VisualHandler: func(text string) tea.Cmd {
+			return func() tea.Msg {
+				return utils.ViewerStringData(text)
 			}
 		},
 	})
