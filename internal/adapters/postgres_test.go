@@ -20,7 +20,7 @@ func TestPostgresGetDatabases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
-	postgres := databse.(Postgres)
+	postgres := databse.(*Postgres)
 	result, err := postgres.GetDatabases()
 	if err != nil {
 		t.Fatalf("Failed to get databases: %v", err)
@@ -44,7 +44,7 @@ func TestPostgresGetTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to database: %v", err)
 	}
-	postgres := database.(Postgres)
+	postgres := database.(*Postgres)
 	result, err := postgres.GetTables("lazysql_test_db")
 	if err != nil {
 		t.Fatalf("Failed to get tables: %v", err)
@@ -71,7 +71,7 @@ func TestPostgresGetTableItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	postgres := database.(Postgres)
+	postgres := database.(*Postgres)
 
 	adminDB, err := sql.Open(dbConnection.Driver, dbConnection.String("postgres"))
 	if err != nil {

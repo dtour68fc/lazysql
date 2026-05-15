@@ -11,11 +11,11 @@ type Postgres struct {
 	currentDatabase string
 }
 
-func InitPostgres(dbConnection *DbConnection) Postgres {
-	return Postgres{dbConnection: dbConnection, db: nil, currentDatabase: "postgres"}
+func InitPostgres(dbConnection *DbConnection) *Postgres {
+	return &Postgres{dbConnection: dbConnection, db: nil, currentDatabase: "postgres"}
 }
 
-func (p Postgres) execute(database string, query string, params ...any) (*sql.Rows, error) {
+func (p *Postgres) execute(database string, query string, params ...any) (*sql.Rows, error) {
 	var err error
 
 	if p.db != nil && p.currentDatabase != database {
@@ -29,12 +29,13 @@ func (p Postgres) execute(database string, query string, params ...any) (*sql.Ro
 		if err != nil {
 			return nil, err
 		}
+		p.currentDatabase = database
 	}
 
 	return p.db.Query(query, params...)
 }
 
-func (p Postgres) GetDatabases() ([]string, error) {
+func (p *Postgres) GetDatabases() ([]string, error) {
 	rows, err := p.execute("postgres", "SELECT datname FROM pg_database WHERE NOT datistemplate;")
 	if err != nil {
 		return nil, err
@@ -51,7 +52,7 @@ func (p Postgres) GetDatabases() ([]string, error) {
 	return databases, rows.Err()
 }
 
-func (p Postgres) GetTables(database string) ([]string, error) {
+func (p *Postgres) GetTables(database string) ([]string, error) {
 	rows, err := p.execute(database, "SELECT table_name FROM information_schema.tables WHERE table_catalog = $1 AND table_schema NOT IN ('pg_catalog', 'information_schema');", database)
 	if err != nil {
 		return nil, err
@@ -68,7 +69,7 @@ func (p Postgres) GetTables(database string) ([]string, error) {
 	return tables, rows.Err()
 }
 
-func (p Postgres) GetTableItem(database string, table string, item string) ([][]string, error) {
+func (p *Postgres) GetTableItem(database string, table string, item string) ([][]string, error) {
 	var rows *sql.Rows
 	var err error
 	switch item {
@@ -88,7 +89,15 @@ func (p Postgres) GetTableItem(database string, table string, item string) ([][]
 	return p.InpsectRows(rows)
 }
 
-func (p Postgres) InpsectRows(rows *sql.Rows) ([][]string, error) {
+func (p *Postgres) RunQuery(query string) ([][]string, error) {
+	rows, err := p.execute(p.currentDatabase, query)
+	if err != nil {
+		return nil, err
+	}
+	return p.InpsectRows(rows)
+}
+
+func (p *Postgres) InpsectRows(rows *sql.Rows) ([][]string, error) {
 	if rows == nil {
 		return nil, fmt.Errorf("rows is nil")
 	}

@@ -25,9 +25,10 @@ type Database interface {
 	GetDatabases() ([]string, error)
 	GetTables(string) ([]string, error)
 	GetTableItem(string, string, string) ([][]string, error)
+	RunQuery(string) ([][]string, error)
 }
 
-func (c DbConnection) String(database string) string {
+func (c *DbConnection) String(database string) string {
 	if c.Url != "" {
 		u, err := url.Parse(c.Url)
 		if err == nil {
@@ -44,7 +45,7 @@ func (c DbConnection) String(database string) string {
 		c.Username, c.Password, c.Host, c.Port, database)
 }
 
-func (c DbConnection) InitConnection() (Database, error) {
+func (c *DbConnection) InitConnection() (Database, error) {
 	var db *sql.DB
 	var err error
 
@@ -59,7 +60,7 @@ func (c DbConnection) InitConnection() (Database, error) {
 		return nil, err
 	}
 	if c.Driver == "pgx" {
-		return InitPostgres(&c), nil
+		return InitPostgres(c), nil
 	}
 	defer db.Close()
 	return nil, fmt.Errorf("unsupported driver: %s", c.Driver)

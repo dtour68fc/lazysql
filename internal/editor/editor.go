@@ -1,12 +1,11 @@
 package editor
 
 import (
+	"github.com/kujtimiihoxha/vimtea"
 	adapters "app.lazygit/internal/adapters"
 	utils "app.lazygit/internal/utils"
 	tea "github.com/charmbracelet/bubbletea"
 	lipgloss "github.com/charmbracelet/lipgloss"
-
-	"github.com/kujtimiihoxha/vimtea"
 )
 
 type EditorModel struct {
@@ -24,14 +23,14 @@ func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayo
 		Key:         "ctrl+r",
 		Mode:        vimtea.ModeVisual,
 		Description: "Run the selected query",
-		Handler: func(buf vimtea.Buffer) tea.Cmd {
-			return func() tea.Msg {
-				return nil
-			}
-		},
 		VisualHandler: func(text string) tea.Cmd {
 			return func() tea.Msg {
-				return utils.ViewerStringData(text)
+				rows, err := database.RunQuery(text)
+				if err != nil {
+					return utils.ViewerStringData(lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Render(err.Error()))
+				} else {
+					return utils.ViewerTableData(rows)
+				}
 			}
 		},
 	})
