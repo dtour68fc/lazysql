@@ -3,16 +3,24 @@ package adapters
 import (
 	"database/sql"
 	"fmt"
+
+	"app.lazygit/internal/session_manager"
 )
 
 type Postgres struct {
 	dbConnection    *DbConnection
 	db              *sql.DB
 	currentDatabase string
+	sessionManager   *session_manager.SessionManager
 }
 
 func InitPostgres(dbConnection *DbConnection) *Postgres {
-	return &Postgres{dbConnection: dbConnection, db: nil, currentDatabase: "postgres"}
+	return &Postgres{
+		dbConnection: dbConnection,
+		db: nil, 
+		currentDatabase: "postgres",
+		sessionManager: session_manager.InitSessionManager(),
+	}
 }
 
 func (p *Postgres) execute(database string, query string, params ...any) (*sql.Rows, error) {
@@ -32,7 +40,15 @@ func (p *Postgres) execute(database string, query string, params ...any) (*sql.R
 		p.currentDatabase = database
 	}
 
-	return p.db.Query(query, params...)
+	result, err := p.db.Query(query, params...)
+
+	err = p.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v", database, query, params))
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return result, err
 }
 
 func (p *Postgres) GetDatabases() ([]string, error) {
