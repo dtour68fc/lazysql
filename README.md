@@ -6,7 +6,7 @@ It currently supports **PostgreSQL**.
 
 > **Alpha.** This project is in early development. Expect rough edges, missing features, and the occasional bug. Issues and PRs are very welcome — please [open an issue](https://github.com/umairabid/lazysql/issues) if something breaks or feels off.
 
-![Main UI — explorer, editor, viewer](assets/main-ui.png)
+![lazysql demo](assets/demo.gif)
 
 ---
 
@@ -34,6 +34,8 @@ Top-right: the Vim editor.
 Bottom-right: query results, scrollable in both axes.
 
 ![Main UI](assets/main-ui.png)
+
+> The recording above (`assets/demo.gif`) is generated from [`demo.tape`](demo.tape) with [`vhs`](https://github.com/charmbracelet/vhs) — run `vhs demo.tape` to regenerate it.
 
 ---
 
