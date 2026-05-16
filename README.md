@@ -4,6 +4,8 @@ A minimal, terminal-first database client for people who live in Vim and tmux. `
 
 It currently supports **PostgreSQL**.
 
+> **Alpha.** This project is in early development. Expect rough edges, missing features, and the occasional bug. Issues and PRs are very welcome — please [open an issue](https://github.com/umairabid/lazysql/issues) if something breaks or feels off.
+
 ![Main UI — explorer, editor, viewer](assets/main-ui.png)
 
 ---
