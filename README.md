@@ -137,7 +137,7 @@ A full Vim buffer via `vimtea` — all your usual normal/insert/visual motions w
 
 | Binding | Action |
 | :--- | :--- |
-| `Ctrl+r` | Run query. In *visual* mode, runs the selection; otherwise runs the whole buffer. |
+| `Ctrl+r` | Run the selected query. **Visual mode only** — select the text you want to execute, then `Ctrl+r`. |
 
 ### Viewer (bottom-right pane)
 
