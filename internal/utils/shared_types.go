@@ -28,4 +28,5 @@ type ConnectionContainerLayout struct {
 	ViewerHeight   int
 	ExplorerWidth  int
 	ExplorerHeight int
+	FooterHeight   int
 }

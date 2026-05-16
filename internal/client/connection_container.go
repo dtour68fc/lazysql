@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"golang.org/x/term"
 	"os"
 
@@ -107,11 +108,43 @@ func (m ConnectionContainerModel) handleKeyboardMsg(msg tea.KeyMsg) (tea.Model, 
 }
 
 func (m ConnectionContainerModel) View() string {
-	return lipgloss.JoinHorizontal(lipgloss.Top,
+	body := lipgloss.JoinHorizontal(lipgloss.Top,
 		m.explorer.View(),
 		lipgloss.JoinVertical(lipgloss.Left,
 			m.editor.View(),
 			m.viewer.View(),
 		),
 	)
+
+	footer := m.buildFooter()
+
+	return lipgloss.JoinVertical(lipgloss.Left, body, footer)
+}
+
+func (m ConnectionContainerModel) buildFooter() string {
+	universal := "shift+tab: switch pane"
+	var specific string
+
+	switch m.active_view {
+	case "explorer":
+		specific = "j/k: up/down, h/l: expand/collapse"
+	case "editor":
+		specific = "ctrl+r: run query"
+	case "viewer":
+		specific = "j/k: rows, h/l: columns"
+	}
+
+	bindings := fmt.Sprintf("%s | %s", universal, specific)
+	pid := fmt.Sprintf("PID: %d", os.Getpid())
+
+	left := lipgloss.NewStyle().Padding(0, 1).Render(bindings)
+	right := lipgloss.NewStyle().Padding(0, 1).Render(pid)
+
+	spacerWidth := m.layout.ScreenWidth - lipgloss.Width(left) - lipgloss.Width(right)
+	if spacerWidth < 0 {
+		spacerWidth = 0
+	}
+	spacer := lipgloss.NewStyle().Width(spacerWidth).Render("")
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, spacer, right)
 }

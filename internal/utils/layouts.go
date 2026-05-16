@@ -35,15 +35,17 @@ func CalculateConnectionManagerLayout(width int, height int) ConnectionManagerLa
 }
 
 func CalculateConnectionContainerLayout(width int, height int) ConnectionContainerLayout {
+	footerHeight := 2
 	explorerWidths := []int{EXPLORER_MIN_WIDTH, width / 4}
 	explorerWidth := slices.Max(explorerWidths)
 
 	editorWidth := width - explorerWidth
 	viewerWidth := editorWidth
 
-	explorerHeight := height
-	editorHeight := height / 3
-	viewerHeight := height - editorHeight
+	bodyHeight := height - footerHeight
+	explorerHeight := bodyHeight
+	editorHeight := bodyHeight / 3
+	viewerHeight := bodyHeight - editorHeight
 
 	return ConnectionContainerLayout{
 		ScreenWidth:    width,
@@ -54,5 +56,6 @@ func CalculateConnectionContainerLayout(width int, height int) ConnectionContain
 		EditorHeight:   editorHeight,
 		ViewerWidth:    viewerWidth,
 		ViewerHeight:   viewerHeight,
+		FooterHeight:   footerHeight,
 	}
 }
