@@ -3,17 +3,17 @@ package conn_manager
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"app.lazygit/internal/adapters"
+	"github.com/zalando/go-keyring"
 )
 
 func TestGetConnections(t *testing.T) {
-	// Setup temporary config directory
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
-	// Test Case 1: File doesn't exist
 	connections, err := getConnections()
 	if err != nil {
 		t.Fatalf("Expected no error when file doesn't exist, got %v", err)
@@ -22,16 +22,11 @@ func TestGetConnections(t *testing.T) {
 		t.Errorf("Expected 0 connections, got %d", len(connections))
 	}
 
-	// Verify file was created
 	configPath := filepath.Join(tempDir, "lazysql", "connections.json")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		t.Error("Expected connections.json to be created")
 	}
 
-	// Test Case 2: File exists with connections
-	// We need to write to the file manually to test reading it back
-	// but wait, we don't have a saveConnections function in utils yet.
-	// So we'll just write it directly.
 	content := `{"test": {"Name": "test", "Host": "localhost"}}`
 	err = os.WriteFile(configPath, []byte(content), 0644)
 	if err != nil {
@@ -49,7 +44,6 @@ func TestGetConnections(t *testing.T) {
 		t.Errorf("Expected connection name 'test', got '%s'", connections["test"].Name)
 	}
 
-	// Test Case 3: Invalid JSON
 	err = os.WriteFile(configPath, []byte("invalid json"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write invalid test file: %v", err)
@@ -65,7 +59,6 @@ func TestSaveConnections(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
-	// Call getConnections first to ensure directory is created, matching app behavior
 	_, _ = getConnections()
 
 	connections := map[string]adapters.DbConnection{
@@ -80,7 +73,6 @@ func TestSaveConnections(t *testing.T) {
 		t.Fatalf("saveConnections failed: %v", err)
 	}
 
-	// Verify we can read it back
 	saved, err := getConnections()
 	if err != nil {
 		t.Fatalf("getConnections failed: %v", err)
@@ -95,11 +87,57 @@ func TestSaveConnections(t *testing.T) {
 	}
 }
 
+func TestKeyringIntegration(t *testing.T) {
+	keyring.MockInit()
+
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	_, _ = getConnections()
+
+	connections := map[string]adapters.DbConnection{
+		"secure-conn": {
+			Name:     "secure-conn",
+			Password: "secret-password",
+			Url:      "postgres://user:url-pass@localhost:5432/db",
+		},
+	}
+
+	err := saveConnections(connections)
+	if err != nil {
+		t.Fatalf("saveConnections failed: %v", err)
+	}
+
+	configPath := filepath.Join(tempDir, "lazysql", "connections.json")
+	content, _ := os.ReadFile(configPath)
+
+	if strings.Contains(string(content), "secret-password") {
+		t.Error("Plain text password found in connections.json")
+	}
+
+	if strings.Contains(string(content), "url-pass") {
+		t.Error("Plain text URL password found in connections.json")
+	}
+
+	restored, err := getConnections()
+	if err != nil {
+		t.Fatalf("getConnections failed: %v", err)
+	}
+
+	if restored["secure-conn"].Password != "secret-password" {
+		t.Errorf("Expected password 'secret-password', got '%s'", restored["secure-conn"].Password)
+	}
+	if restored["secure-conn"].Url != "postgres://user:url-pass@localhost:5432/db" {
+		t.Errorf("Expected URL with password, got '%s'", restored["secure-conn"].Url)
+	}
+
+	deleteFromKeyring("secure-conn")
+}
+
 func TestReadConnectionsFile_OtherError(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
-	// Create a directory where the file should be to trigger an EISDIR error on ReadFile
 	configPath := filepath.Join(tempDir, "lazysql", "connections.json")
 	err := os.MkdirAll(configPath, 0755)
 	if err != nil {
@@ -113,18 +151,13 @@ func TestReadConnectionsFile_OtherError(t *testing.T) {
 }
 
 func TestGetConnections_CreateDirFail(t *testing.T) {
-	// Setup a path that should fail to be created
-	// We can't easily mock os.MkdirAll, but we can point it to a read-only directory
 	tempDir := t.TempDir()
 	readOnlyDir := filepath.Join(tempDir, "readonly")
-	err := os.Mkdir(readOnlyDir, 0555) // Read and execute only
+	err := os.Mkdir(readOnlyDir, 0555)
 	if err != nil {
 		t.Fatalf("Failed to create read-only dir: %v", err)
 	}
 
-	// We want getConnections to try and create a subdir in readOnlyDir
-	// getConnectionsFilePath returns userConfigDir + "/lazysql/connections.json"
-	// if we set XDG_CONFIG_HOME to readOnlyDir, it will try to create readOnlyDir/lazysql
 	t.Setenv("XDG_CONFIG_HOME", readOnlyDir)
 
 	_, err = getConnections()
@@ -149,7 +182,6 @@ func TestGetConnectionsFilePath(t *testing.T) {
 }
 
 func TestGetConnectionsFilePath_Error(t *testing.T) {
-	// Unset HOME to make os.UserConfigDir fail on Linux
 	home := os.Getenv("HOME")
 	os.Unsetenv("HOME")
 	defer os.Setenv("HOME", home)

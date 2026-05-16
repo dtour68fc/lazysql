@@ -2,10 +2,16 @@ package conn_manager
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"strings"
 
 	"app.lazygit/internal/adapters"
+	"github.com/zalando/go-keyring"
+)
+
+const (
+	keyringService = "lazysql"
 )
 
 func saveConnections(connections map[string]adapters.DbConnection) error {
@@ -14,7 +20,33 @@ func saveConnections(connections map[string]adapters.DbConnection) error {
 		return err
 	}
 
-	connectionsJson, err := json.MarshalIndent(connections, "", "  ")
+	saveMap := make(map[string]adapters.DbConnection)
+	for name, conn := range connections {
+		connCopy := conn
+
+		if connCopy.Password != "" {
+			err := keyring.Set(keyringService, name+"-password", connCopy.Password)
+			if err == nil {
+				connCopy.Password = ""
+			}
+		}
+
+		if connCopy.Url != "" {
+			u, err := url.Parse(connCopy.Url)
+			if err == nil && u.User != nil {
+				_, hasPass := u.User.Password()
+				if hasPass {
+					err := keyring.Set(keyringService, name+"-url", connCopy.Url)
+					if err == nil {
+						connCopy.Url = ""
+					}
+				}
+			}
+		}
+		saveMap[name] = connCopy
+	}
+
+	connectionsJson, err := json.MarshalIndent(saveMap, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -52,7 +84,24 @@ func getConnections() (map[string]adapters.DbConnection, error) {
 		return nil, err
 	}
 
+	for name, conn := range connections {
+		if pw, err := keyring.Get(keyringService, name+"-password"); err == nil {
+			conn.Password = pw
+		}
+
+		if u, err := keyring.Get(keyringService, name+"-url"); err == nil {
+			conn.Url = u
+		}
+		connections[name] = conn
+	}
+
 	return connections, nil
+}
+
+func deleteFromKeyring(name string) error {
+	keyring.Delete(keyringService, name+"-password")
+	keyring.Delete(keyringService, name+"-url")
+	return nil
 }
 
 func readConnectionsFile() ([]byte, error) {

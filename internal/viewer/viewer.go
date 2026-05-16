@@ -15,7 +15,7 @@ type ViewerModel struct {
 	table       utils.Table
 	layout      utils.ConnectionContainerLayout
 	isActive    bool
-	content string
+	content     string
 }
 
 func InitViewer(database adapters.Database, layout utils.ConnectionContainerLayout) ViewerModel {
@@ -24,7 +24,7 @@ func InitViewer(database adapters.Database, layout utils.ConnectionContainerLayo
 		layout:   layout,
 		isActive: false,
 		table:    utils.InitTable([][]string{}, layout.ViewerWidth, layout.ViewerHeight),
-		content: "",
+		content:  "",
 	}
 }
 

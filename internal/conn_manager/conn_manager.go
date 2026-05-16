@@ -85,6 +85,7 @@ func (m ConnectionManager) saveConnection() tea.Cmd {
 		connection := form.toDbConnection()
 		if conn, exists := m.connectionsByName[m.selectedConnectionName]; exists {
 			delete(m.connectionsByName, conn.Name)
+			deleteFromKeyring(conn.Name)
 		}
 		m.connectionsByName[connection.Name] = connection
 		err := saveConnections(m.connectionsByName)

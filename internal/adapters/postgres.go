@@ -11,15 +11,15 @@ type Postgres struct {
 	dbConnection    *DbConnection
 	db              *sql.DB
 	currentDatabase string
-	sessionManager   *session_manager.SessionManager
+	sessionManager  *session_manager.SessionManager
 }
 
 func InitPostgres(dbConnection *DbConnection) *Postgres {
 	return &Postgres{
-		dbConnection: dbConnection,
-		db: nil, 
+		dbConnection:    dbConnection,
+		db:              nil,
 		currentDatabase: "postgres",
-		sessionManager: session_manager.InitSessionManager(),
+		sessionManager:  session_manager.InitSessionManager(),
 	}
 }
 

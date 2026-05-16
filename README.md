@@ -15,6 +15,8 @@ It currently supports **PostgreSQL**.
 - **Clean, uncluttered TUI.** Three panes, one footer hint line, no chrome. Nothing on the screen you didn't ask for.
 - **Vim bindings everywhere.** `h j k l` to move, `?` for help, `m` to toggle, `Shift+Tab` to switch panes. The query editor is a full Vim buffer powered by [`vimtea`](https://github.com/kujtimiihoxha/vimtea) — modes, motions, visual selection, all of it.
 - **Three connection modes — including a *command* mode.** Plug in static credentials, paste a connection URL, *or* point `lazysql` at a shell command that prints credentials on stdout. The command runs every time you connect, which makes rotating secrets (Vault, AWS RDS IAM auth, GCP IAM, short-lived dev tokens) painless.
+- **Secure password storage.** Sensitive data like passwords and URLs with credentials are automatically stored in your operating system's **keyring** (macOS Keychain, Windows Credential Locker, or Linux Secret Service).
+    - **Note**: If no keyring service is running or available (e.g., in a headless Linux environment), `lazysql` will fall back to storing passwords in **plain text** within `connections.json`. Ensure your environment is secure if you rely on this fallback.
 - **Session logs for your AI agent.** Every session writes a log file you can hand to Claude / Gemini / your agent of choice to give it concrete database context — the queries you ran, the schemas you touched — without copy-pasting.
 
 ---

@@ -1,11 +1,11 @@
 package editor
 
 import (
-	"github.com/kujtimiihoxha/vimtea"
 	adapters "app.lazygit/internal/adapters"
 	utils "app.lazygit/internal/utils"
 	tea "github.com/charmbracelet/bubbletea"
 	lipgloss "github.com/charmbracelet/lipgloss"
+	"github.com/kujtimiihoxha/vimtea"
 )
 
 type EditorModel struct {
