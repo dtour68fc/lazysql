@@ -116,6 +116,8 @@ func (m ExplorerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isActive = string(msg) == "explorer"
 	case utils.LayoutUpdated:
 		m.layout = utils.ConnectionContainerLayout(msg)
+		m.viewport.Width = (m.layout.ExplorerWidth - 4)
+		m.viewport.Height = (m.layout.ExplorerHeight - 4)
 	}
 	m.viewport.SetContent(m.ListNode(m.explorerList.Root, 0))
 	m.viewport, viewportCmd = m.viewport.Update(msg)

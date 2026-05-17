@@ -4,7 +4,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"slices"
 	"strings"
-
+	
 	viewport "github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	lipgloss "github.com/charmbracelet/lipgloss"
@@ -25,8 +25,6 @@ var MIN_COLUMN_WIDTH = 100
 type Table struct {
 	Columns             []string
 	Rows                [][]string
-	Width               int
-	Height              int
 	SelectedRow         int
 	SelectedColumn      int
 	ColumnsStyle        lipgloss.Style
@@ -54,8 +52,6 @@ func InitTable(data [][]string, width int, height int) Table {
 	table := Table{
 		Columns:             cols,
 		Rows:                rows,
-		Width:               width,
-		Height:              height,
 		SelectedRow:         0,
 		SelectedColumn:      0,
 		ColumnsStyle:        lipgloss.NewStyle().Bold(true),
@@ -94,6 +90,10 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 				t.SelectedRow--
 			}
 		}
+	case LayoutUpdated:
+		layout := ConnectionContainerLayout(msg)
+		t.Viewport.Width = (layout.ViewerWidth - 4)
+		t.Viewport.Height = (layout.ViewerHeight - 4)
 	}
 	content := t.renderColumns() + "\n" + t.renderRows()
 	t.Viewport.SetContent(content)
