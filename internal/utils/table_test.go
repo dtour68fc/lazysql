@@ -41,8 +41,8 @@ func TestInitTable(t *testing.T) {
 		if len(table.Rows) != 2 {
 			t.Errorf("Expected 2 rows, got %d", len(table.Rows))
 		}
-		if table.Width != width || table.Height != height {
-			t.Errorf("Expected size %dx%d, got %dx%d", width, height, table.Width, table.Height)
+		if table.Viewport.Width != width-2 || table.Viewport.Height != height-2 {
+			t.Errorf("Expected size %dx%d, got %dx%d", width-2, height-2, table.Viewport.Width, table.Viewport.Height)
 		}
 		if table.SelectedRow != 0 || table.SelectedColumn != 0 {
 			t.Errorf("Expected initial selection (0,0), got (%d,%d)", table.SelectedRow, table.SelectedColumn)

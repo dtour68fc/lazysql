@@ -21,6 +21,21 @@ func TestDbConnectionString(t *testing.T) {
 		}
 	})
 
+	t.Run("mysql connection string", func(t *testing.T) {
+		c := DbConnection{
+			Driver:   "mysql",
+			Username: "root",
+			Password: "rootpassword",
+			Host:     "127.0.0.1",
+			Port:     "3306",
+		}
+		got := c.String("mysql")
+		want := "root:rootpassword@tcp(127.0.0.1:3306)/mysql"
+		if got != want {
+			t.Errorf("String() = %q, want %q", got, want)
+		}
+	})
+
 	t.Run("connection string from URL", func(t *testing.T) {
 		c := DbConnection{
 			Url: "postgres://user:pass@remotehost:5433/ignored",

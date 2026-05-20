@@ -102,7 +102,7 @@ func (p *Postgres) GetTableItem(database string, table string, item string) ([][
 	if err != nil {
 		return nil, err
 	}
-	return p.InpsectRows(rows)
+	return p.InspectRows(rows)
 }
 
 func (p *Postgres) RunQuery(query string) ([][]string, error) {
@@ -110,10 +110,10 @@ func (p *Postgres) RunQuery(query string) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p.InpsectRows(rows)
+	return p.InspectRows(rows)
 }
 
-func (p *Postgres) InpsectRows(rows *sql.Rows) ([][]string, error) {
+func (p *Postgres) InspectRows(rows *sql.Rows) ([][]string, error) {
 	if rows == nil {
 		return nil, fmt.Errorf("rows is nil")
 	}

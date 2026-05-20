@@ -8,6 +8,7 @@ import (
 
 	"database/sql"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type DbConnection struct {
@@ -41,6 +42,10 @@ func (c *DbConnection) String(database string) string {
 		c.collectCredentialsFromCommand()
 	}
 
+	if c.Driver == "mysql" {
+		return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", c.Username, c.Password, c.Host, c.Port, database)
+	}
+
 	return fmt.Sprintf("user=%s password=%s host=%s port=%s database=%s",
 		c.Username, c.Password, c.Host, c.Port, database)
 }
@@ -48,8 +53,17 @@ func (c *DbConnection) String(database string) string {
 func (c *DbConnection) InitConnection() (Database, error) {
 	var db *sql.DB
 	var err error
+	var database string
 
-	db, err = sql.Open(c.Driver, c.String("postgres"))
+	if c.Driver == "pgx" {
+		database = "postgres"
+	} else if c.Driver == "mysql" {
+		database = "mysql"
+	} else {
+		return nil, fmt.Errorf("unsupported driver: %s", c.Driver)
+	}
+
+	db, err = sql.Open(c.Driver, c.String(database))
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +75,8 @@ func (c *DbConnection) InitConnection() (Database, error) {
 	}
 	if c.Driver == "pgx" {
 		return InitPostgres(c), nil
+	} else if c.Driver == "mysql" {
+		return InitMySQL(c), nil
 	}
 	defer db.Close()
 	return nil, fmt.Errorf("unsupported driver: %s", c.Driver)
