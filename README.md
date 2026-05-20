@@ -2,7 +2,7 @@
 
 A minimal, terminal-first database client for people who live in Vim and tmux. `lazysql` keeps its UI out of your way and your hands on the home row — a focused explorer, a real Vim editor for your queries, and a results viewer, side by side.
 
-It currently supports **PostgreSQL**.
+It currently supports **PostgreSQL** and **MySQL**.
 
 > **Alpha.** This project is in early development. Expect rough edges, missing features, and the occasional bug. Issues and PRs are very welcome — please [open an issue](https://github.com/umairabid/lazysql/issues) if something breaks or feels off.
 
@@ -64,10 +64,11 @@ The familiar form: driver, name, host, port, user, password.
 
 ### 2. URL
 
-A single PostgreSQL connection string:
+A single database connection string. Both PostgreSQL and MySQL URLs are supported:
 
 ```
 postgres://user:password@host:5432/dbname?sslmode=require
+mysql://user:password@host:3306/dbname
 ```
 
 ### 3. Command — *for rotating credentials*
@@ -171,7 +172,7 @@ A full Vim buffer via `vimtea` — all your usual normal/insert/visual motions w
 
 ## Roadmap
 
-- Additional drivers (MySQL, SQLite, MSSQL).
+- Additional drivers (SQLite, MSSQL).
 - Query history / re-run.
 - Configurable theming.
 

@@ -37,6 +37,7 @@ func renderHelp(width int, height int) string {
 - Name is for connection name that will appear in the list
 - Driver is used to establish and find the database server, user
  * pgx for PostgreSQL
+ * mysql for MySQL
 - Quit this dialog by hitting "?" or "esc"
 	`
 	return lipgloss.NewStyle().
