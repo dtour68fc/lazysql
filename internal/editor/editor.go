@@ -28,8 +28,10 @@ func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayo
 				rows, err := database.RunQuery(text)
 				if err != nil {
 					return utils.ViewerStringData(lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Render(err.Error()))
-				} else {
+				} else if len(rows) > 0 && len(rows[0]) > 0 {
 					return utils.ViewerTableData(rows)
+				} else {
+					return utils.ViewerStringData(lipgloss.NewStyle().Foreground(lipgloss.Color("34")).Render("Query executed successfully"))
 				}
 			}
 		},

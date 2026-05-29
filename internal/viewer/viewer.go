@@ -39,8 +39,10 @@ func (m ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case utils.ViewerStringData:
 		m.content = string(msg)
+		m.table = utils.InitTable([][]string{}, m.layout.ViewerWidth-2, m.layout.ViewerHeight-2)
 	case utils.ViewerTableData:
 		m.table = createTableFromData(msg, m.layout)
+		m.content = ""
 	case utils.ActiveViewChanged:
 		m.isActive = string(msg) == "viewer"
 	case utils.LayoutUpdated:
