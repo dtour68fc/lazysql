@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"app.lazygit/internal/adapters"
 	"github.com/zalando/go-keyring"
@@ -109,7 +109,6 @@ func readConnectionsFile() ([]byte, error) {
 	var fileErr error
 
 	connectionsPath, err := getConnectionsFilePath()
-	lazysqlConfigDir := strings.ReplaceAll(connectionsPath, "/connections.json", "")
 	if err != nil {
 		return fileContent, err
 	}
@@ -118,7 +117,8 @@ func readConnectionsFile() ([]byte, error) {
 	if fileErr != nil {
 		if os.IsNotExist(fileErr) {
 			fileErr = nil
-			os.MkdirAll(lazysqlConfigDir+"/lazysql", os.ModePerm)
+			lazysqlConfigDir := filepath.Dir(connectionsPath)
+			os.MkdirAll(lazysqlConfigDir, os.ModePerm)
 			os.WriteFile(connectionsPath, []byte("{}"), 0644)
 			fileContent, fileErr = os.ReadFile(connectionsPath)
 		} else {
@@ -129,10 +129,14 @@ func readConnectionsFile() ([]byte, error) {
 }
 
 func getConnectionsFilePath() (string, error) {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "lazysql", "connections.json"), nil
+	}
+
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
 
-	return userConfigDir + "/lazysql/connections.json", nil
+	return filepath.Join(userConfigDir, "lazysql", "connections.json"), nil
 }

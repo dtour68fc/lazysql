@@ -40,15 +40,19 @@ func (p *Postgres) execute(database string, query string, params ...any) (*sql.R
 		p.currentDatabase = database
 	}
 
-	result, err := p.db.Query(query, params...)
+	result, queryErr := p.db.Query(query, params...)
 
-	err = p.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v", database, query, params))
-
-	if err != nil {
-		fmt.Println(err)
+	if queryErr != nil {
+		p.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v, error: %v", database, query, params, queryErr.Error()))
+	} else {
+		p.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v", database, query, params))
 	}
 
-	return result, err
+	if queryErr != nil {
+		return nil, queryErr
+	}
+
+	return result, queryErr
 }
 
 func (p *Postgres) GetDatabases() ([]string, error) {

@@ -49,6 +49,12 @@ func (s *SessionManager) getConfigDir() string {
 	if s.configDir != "" {
 		return s.configDir
 	}
+
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		s.configDir = xdg
+		return s.configDir
+	}
+
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		panic("Unable to determine user config directory")

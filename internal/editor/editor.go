@@ -18,6 +18,7 @@ type EditorModel struct {
 func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayout) EditorModel {
 	editor := vimtea.NewEditor(
 		vimtea.WithEnableStatusBar(true),
+		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("255"))),
 	)
 	editor.AddBinding(vimtea.KeyBinding{
 		Key:         "ctrl+r",
