@@ -63,7 +63,6 @@ func (m ConnectionManager) toggleConnectionEdit() tea.Cmd {
 func loadSavedConnections() tea.Cmd {
 	return func() tea.Msg {
 		connections, err := getConnections()
-		fmt.Printf("Loaded connections: %+v\n", connections)
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to load connections: %s", err))
 		}
