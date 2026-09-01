@@ -8,6 +8,15 @@ import (
 	"github.com/kujtimiihoxha/vimtea"
 )
 
+// IsCapturingInput reports whether the underlying vim editor is in a mode
+// that should swallow raw keystrokes (Insert/Command), meaning global
+// window-navigation shortcuts (1/2/3, tab, shift+j/k) must NOT be
+// intercepted so the user can still type digits/letters into their query.
+func (m EditorModel) IsCapturingInput() bool {
+	mode := m.editor.GetMode()
+	return mode == vimtea.ModeInsert || mode == vimtea.ModeCommand
+}
+
 type EditorModel struct {
 	database adapters.Database
 	layout   utils.ConnectionContainerLayout

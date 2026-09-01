@@ -63,6 +63,30 @@ func (m ConnectionContainerModel) changeActiveView() tea.Cmd {
 	}
 }
 
+// changeActiveViewBackward is the reverse of changeActiveView, used by
+// Shift+Tab (matching LazyCurl: Tab cycles forward, Shift+Tab cycles back).
+func (m ConnectionContainerModel) changeActiveViewBackward() tea.Cmd {
+	return func() tea.Msg {
+		var newActiveView string
+		switch m.active_view {
+		case "explorer":
+			newActiveView = "viewer"
+		case "viewer":
+			newActiveView = "editor"
+		default:
+			newActiveView = "explorer"
+		}
+		return utils.ActiveViewChanged(newActiveView)
+	}
+}
+
+// jumpToView directly focuses a named view, same as LazyCurl's 1/2/3.
+func jumpToView(view string) tea.Cmd {
+	return func() tea.Msg {
+		return utils.ActiveViewChanged(view)
+	}
+}
+
 func (m ConnectionContainerModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.explorer.Init(),
@@ -93,10 +117,38 @@ func (m ConnectionContainerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m ConnectionContainerModel) handleKeyboardMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd, activeViewCmd tea.Cmd
-	switch msg.String() {
-	case "shift+tab":
-		cmd = m.changeActiveView()
+
+	// If the SQL editor is currently active and capturing raw keystrokes
+	// (Insert/Command mode), global window-navigation shortcuts must be
+	// disabled so the user can type digits/letters/tab into their query.
+	editorCapturingInput := false
+	if e, ok := m.editor.(editor.EditorModel); ok {
+		editorCapturingInput = m.active_view == "editor" && e.IsCapturingInput()
 	}
+
+	if !editorCapturingInput {
+		switch msg.String() {
+		case "1":
+			cmd = jumpToView("explorer")
+		case "2":
+			cmd = jumpToView("editor")
+		case "3":
+			cmd = jumpToView("viewer")
+		case "tab":
+			cmd = m.changeActiveView()
+		case "shift+tab":
+			cmd = m.changeActiveViewBackward()
+		case "shift+j":
+			if m.active_view == "editor" || m.active_view == "explorer" {
+				cmd = jumpToView("viewer")
+			}
+		case "shift+k":
+			if m.active_view == "viewer" || m.active_view == "explorer" {
+				cmd = jumpToView("editor")
+			}
+		}
+	}
+
 	if m.active_view == "explorer" {
 		m.explorer, activeViewCmd = m.explorer.Update(msg)
 	} else if m.active_view == "editor" {
@@ -122,7 +174,7 @@ func (m ConnectionContainerModel) View() string {
 }
 
 func (m ConnectionContainerModel) buildFooter() string {
-	universal := "shift+tab: switch pane"
+	universal := "1/2/3: jump pane, tab/shift+tab: cycle, shift+j/k: editor<->viewer"
 	var specific string
 
 	switch m.active_view {
