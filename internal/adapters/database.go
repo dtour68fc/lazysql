@@ -20,6 +20,7 @@ type DbConnection struct {
 	Driver   string
 	Command  string
 	Url      string
+	Project  string // Groups connections under a project (e.g. "PMO", "PMC"), like LazyCurl
 }
 
 type Database interface {

@@ -15,12 +15,14 @@ type ConnectionForm struct {
 	focusIndex  int
 	layout      utils.ConnectionManagerLayout
 	connections map[string]adapters.DbConnection
+	driverIndex int // Index into DriverOptions for the Driver field (input 0)
 }
 
 func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
+	driverInput := createDriverInput(DriverOptions[0].Label)
 	return ConnectionForm{
 		inputs: []textinput.Model{
-			createDriverInput(""),
+			driverInput,
 			createNameInput(""),
 			createHostInput(""),
 			createPortInput(""),
@@ -28,10 +30,14 @@ func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
 			createPasswordInput(""),
 			createUrlInput(""),
 			createCommandInput(""),
+			createProjectInput(""), // index 8 - appended, not inserted, so
+			// none of the hardcoded 0-7 indices used throughout this file
+			// shift around
 		},
-		focusIndex: -1,
-		layout:     layout,
-		mode:       "credentials",
+		focusIndex:  -1,
+		layout:      layout,
+		mode:        "credentials",
+		driverIndex: 0,
 	}
 }
 
@@ -58,7 +64,8 @@ func (m ConnectionForm) updateInputs(msg tea.Msg) tea.Cmd {
 }
 
 func (m ConnectionForm) setSelectedConnection(conn adapters.DbConnection) ConnectionForm {
-	m.inputs[0].SetValue(conn.Driver)
+	m.driverIndex = driverIndexForValue(conn.Driver)
+	m.inputs[0].SetValue(DriverOptions[m.driverIndex].Label)
 	m.inputs[1].SetValue(conn.Name)
 	m.inputs[2].SetValue(conn.Host)
 	m.inputs[3].SetValue(conn.Port)
@@ -66,6 +73,7 @@ func (m ConnectionForm) setSelectedConnection(conn adapters.DbConnection) Connec
 	m.inputs[5].SetValue(conn.Password)
 	m.inputs[6].SetValue(conn.Url)
 	m.inputs[7].SetValue(conn.Command)
+	m.inputs[8].SetValue(conn.Project)
 
 	if conn.Command != "" {
 		m.mode = "command"
@@ -93,7 +101,16 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(cmds...)
 			}
 		case "m":
-			if m.focusIndex == -1 {
+			// Also allowed while editing as long as the Driver field is
+			// focused (index 0) - that field never accepts typed text (see
+			// the h/l cycling below), so there's no ambiguity with typing a
+			// literal "m". This used to require focusIndex == -1 (not
+			// editing at all), which meant once you pressed 'e' to edit a
+			// connection that was saved in url/command mode, you could
+			// NEVER switch back to credentials mode to reveal Host/User/
+			// Password - they just don't show up in url/command mode at
+			// all (see getVisibleIndices), and there was no way out.
+			if m.focusIndex == -1 || m.focusIndex == 0 {
 				if m.mode == "credentials" {
 					m.mode = "command"
 				} else if m.mode == "command" {
@@ -103,6 +120,26 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
+		case "left", "h":
+			if m.focusIndex == 0 {
+				m.driverIndex = (m.driverIndex - 1 + len(DriverOptions)) % len(DriverOptions)
+				m.inputs[0].SetValue(DriverOptions[m.driverIndex].Label)
+				return m, nil
+			}
+		case "right", "l":
+			if m.focusIndex == 0 {
+				m.driverIndex = (m.driverIndex + 1) % len(DriverOptions)
+				m.inputs[0].SetValue(DriverOptions[m.driverIndex].Label)
+				return m, nil
+			}
+		}
+
+		// The Driver field is a closed set of options (see DriverOptions) -
+		// cycle with left/right/h/l above, never accept free-typed text here
+		// (that's what let "PostgreSQL" get typed in instead of the actual
+		// accepted value "pgx", silently saving an unusable connection).
+		if m.focusIndex == 0 {
+			return m, nil
 		}
 	case SelectedConnectionMsg:
 		conn := adapters.DbConnection(msg)
@@ -145,6 +182,9 @@ func (m ConnectionForm) getVisibleIndices() []int {
 	} else if m.mode == "command" {
 		indices = append(indices, 7)
 	}
+	// Project (index 8) is always visible, same as Driver/Name, regardless
+	// of credentials/url/command mode
+	indices = append(indices, 8)
 	return indices
 }
 
@@ -192,7 +232,7 @@ func (m ConnectionForm) changeFocusIndex(key string) int {
 
 func (m ConnectionForm) toDbConnection() adapters.DbConnection {
 	return adapters.DbConnection{
-		Driver:   m.inputs[0].Value(),
+		Driver:   DriverOptions[m.driverIndex].Value,
 		Name:     m.inputs[1].Value(),
 		Host:     m.inputs[2].Value(),
 		Port:     m.inputs[3].Value(),
@@ -200,5 +240,6 @@ func (m ConnectionForm) toDbConnection() adapters.DbConnection {
 		Password: m.inputs[5].Value(),
 		Url:      m.inputs[6].Value(),
 		Command:  m.inputs[7].Value(),
+		Project:  m.inputs[8].Value(),
 	}
 }

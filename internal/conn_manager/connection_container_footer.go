@@ -6,18 +6,21 @@ import (
 )
 
 func editFooter() string {
-	return fmt.Sprintf("%s, %s",
+	return fmt.Sprintf("%s, %s, %s, %s",
 		"Cancel (esc)",
 		"Navigate (tab, shift+tab)",
+		"Change Driver (h/l, ←/→ on Driver field)",
+		"Change Mode (m, on Driver field)",
 	)
 }
 
 func normalFooter() string {
-	return fmt.Sprintf("%s, %s, %s, %s, %s, %s",
+	return fmt.Sprintf("%s, %s, %s, %s, %s, %s, %s",
 		"Connect (enter)",
 		"Edit (e)",
 		"Save (s)",
 		"Navigate (j,k)",
+		"Switch Connections/Projects (tab)",
 		"Change Mode (m)",
 		"Help (?)",
 	)
@@ -35,9 +38,9 @@ func connectingFooter() string {
 func renderHelp(width int, height int) string {
 	helpText := `Connection Manager Help
 - Name is for connection name that will appear in the list
-- Driver is used to establish and find the database server, user
- * pgx for PostgreSQL
- * mysql for MySQL
+- Driver is used to establish and find the database server
+ * Cycle between the supported drivers with h/l or left/right arrows
+ * PostgreSQL (pgx) and MySQL (mysql) are currently supported
 - Quit this dialog by hitting "?" or "esc"
 	`
 	return lipgloss.NewStyle().
