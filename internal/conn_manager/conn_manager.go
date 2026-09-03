@@ -341,28 +341,27 @@ func (m ConnectionManager) View() string {
 		helpView := renderHelp(m.layout.HelpWidth, m.layout.HelpHeight)
 		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, helpView)
 	}
+	if m.editingConnection {
+		// Full-screen takeover, same as the help overlay - the modal
+		// needs 50-70 cols, more than the (now much narrower) Connection
+		// Manager panel has room to give it without overflowing past its
+		// own border.
+		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, m.form.View())
+	}
 
 	return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, m.RenderPanel())
 }
 
 // RenderPanel renders just the bordered "Connection Manager" box itself,
 // without centering it on the full screen - used by AppModel to hang it on
-// the left side alongside empty Editor/Viewer placeholder panels.
+// the left side alongside empty Editor/Viewer placeholder panels. Not used
+// while editingConnection is true - AppModel takes the full-screen modal
+// path (View()) instead, since the modal needs more width than this narrow
+// panel can offer without overflowing its own border.
 func (m ConnectionManager) RenderPanel() string {
 	footer := m.buildFooter()
-
-	var body string
-	if m.editingConnection {
-		// The connection form is a centered popup modal (like LazyCurl's
-		// New Project dialog) instead of a permanently-docked side panel -
-		// list is hidden underneath it while editing, same as the
-		// full-screen help overlay already replaces content elsewhere.
-		modalArea := lipgloss.Place(m.layout.WinWidth, m.layout.BodyHeight, lipgloss.Center, lipgloss.Center, m.form.View())
-		body = lipgloss.JoinVertical(lipgloss.Top, modalArea, footer)
-	} else {
-		listView := m.list.View()
-		body = lipgloss.JoinVertical(lipgloss.Top, listView, footer)
-	}
+	listView := m.list.View()
+	body := lipgloss.JoinVertical(lipgloss.Top, listView, footer)
 
 	// Same panel style as the connected screen (editor/viewer) - title
 	// embedded directly in the rounded border, matching LazyCurl, instead

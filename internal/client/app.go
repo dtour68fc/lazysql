@@ -205,6 +205,15 @@ func (m AppModel) View() string {
 	if m.connectionManager.IsShowingHelp() {
 		return m.connectionManager.View()
 	}
+	if m.connectionManager.IsEditingConnection() {
+		// The New/Edit Connection modal needs more width (50-70 cols)
+		// than the narrow Connection Manager panel has to give it (it
+		// used to be a full third of the screen, now it's about half
+		// that) - render it as a full-screen takeover, same as the help
+		// overlay, instead of squeezing it into the panel body and
+		// having it overflow past the panel's own border.
+		return m.connectionManager.View()
+	}
 
 	left := m.connectionManager.RenderPanel()
 	panelHeight := m.connectionManager.PanelHeight()
