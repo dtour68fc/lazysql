@@ -90,7 +90,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			*m.connectionContainer = updated
 			sizeCmd = cmd
 		}
-		return m, tea.Batch(m.connectionContainer.Init(), sizeCmd, m.applyActiveViewChangedCmd("editor"))
+		// Also forward ConnectedMsg to the Connection Manager itself -
+		// this branch used to return early without doing that at all,
+		// which meant ConnectionManager.Update()'s own "case ConnectedMsg"
+		// (added specifically to reset its connecting flag) never
+		// actually ran. It kept showing "Connecting..." forever even
+		// though the connection had already succeeded and you'd been
+		// bounced straight into the (now live) editor.
+		updatedCM, cmCmd := m.connectionManager.Update(msg)
+		m.connectionManager = updatedCM.(conn_manager.ConnectionManager)
+		return m, tea.Batch(m.connectionContainer.Init(), sizeCmd, m.applyActiveViewChangedCmd("editor"), cmCmd)
 	}
 
 	return m.routeToActivePane(msg)
