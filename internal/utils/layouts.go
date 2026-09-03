@@ -20,8 +20,18 @@ func CalculateConnectionManagerLayout(width int, height int) ConnectionManagerLa
 	heights := []int{CONNECTION_MANAGER_MIN_HEIGHT, height}
 	winWidth := slices.Max(widths)
 	winHeight := slices.Max(heights)
-	listWidth := winWidth / 3
-	formWidth := winWidth - listWidth
+	// The connection form used to permanently occupy 2/3 of the panel
+	// width next to the list. It's now a centered modal popup (like
+	// LazyCurl's New Project modal) instead, so the list gets the full
+	// width and the modal gets its own fixed, more compact size.
+	listWidth := winWidth
+	modalWidth := winWidth / 2
+	if modalWidth > 70 {
+		modalWidth = 70
+	}
+	if modalWidth < 50 {
+		modalWidth = 50
+	}
 
 	return ConnectionManagerLayout{
 		ScreenWidth:         width,
@@ -31,7 +41,7 @@ func CalculateConnectionManagerLayout(width int, height int) ConnectionManagerLa
 		HeaderHeight:        headerHeight,
 		BodyHeight:          winHeight - (headerHeight + footerHeight),
 		ConnectionListWidth: listWidth,
-		ConnectionFormWidth: formWidth,
+		ModalWidth:          modalWidth,
 		FooterHeight:        footerHeight,
 		HelpWidth:           winWidth / 2,
 		HelpHeight:          winHeight + 4,

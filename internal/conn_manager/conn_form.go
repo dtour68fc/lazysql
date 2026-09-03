@@ -164,13 +164,39 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m ConnectionForm) View() string {
+	return m.RenderModal()
+}
+
+// RenderModal renders the connection form as a centered popup modal (like
+// LazyCurl's "New Project" dialog) instead of a permanently-docked side
+// panel - title, fields, and a Save/Cancel hint row, all in one bordered
+// box. Only shown while actively editing (ConnectionManager.editingConnection).
+func (m ConnectionForm) RenderModal() string {
+	title := "New Connection"
+	if name := m.inputs[1].Value(); name != "" && name != "New Connection" {
+		title = "Edit Connection: " + name
+	}
+	titleStyle := lipgloss.NewStyle().Bold(true).Align(lipgloss.Center).Width(m.layout.ModalWidth - 4)
+
 	indices := m.getVisibleIndices()
-	result := m.renderFieldsForIndexes(indices)
+	fields := m.renderFieldsForIndexes(indices)
+
+	buttonRow := lipgloss.NewStyle().
+		Width(m.layout.ModalWidth-4).
+		Align(lipgloss.Center).
+		MarginTop(1).
+		Render("Save (s)   Cancel (esc)")
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		append([]string{titleStyle.Render(title), ""}, append(fields, buttonRow)...)...,
+	)
 
 	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, false, true).
-		Width(m.layout.ConnectionFormWidth).
-		Height(m.layout.BodyHeight).Render(lipgloss.JoinVertical(lipgloss.Left, result...))
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("141")).
+		Width(m.layout.ModalWidth).
+		Padding(1, 2).
+		Render(content)
 }
 
 func (m ConnectionForm) getVisibleIndices() []int {

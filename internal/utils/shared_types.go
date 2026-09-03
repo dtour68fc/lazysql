@@ -14,6 +14,7 @@ type ConnectionManagerLayout struct {
 	BodyHeight          int
 	ConnectionListWidth int
 	ConnectionFormWidth int
+	ModalWidth          int // Width of the New/Edit Connection modal popup (see conn_form.go RenderModal)
 	FooterHeight        int
 	HelpWidth           int
 	HelpHeight          int

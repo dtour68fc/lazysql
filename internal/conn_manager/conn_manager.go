@@ -243,10 +243,19 @@ func (m ConnectionManager) View() string {
 // way the connected screen hangs Explorer on the left of Editor/Viewer.
 func (m ConnectionManager) RenderPanel() string {
 	footer := m.buildFooter()
-	listView := m.list.View()
-	formView := m.form.View()
-	listAndFormView := lipgloss.JoinHorizontal(lipgloss.Top, listView, formView)
-	body := lipgloss.JoinVertical(lipgloss.Top, listAndFormView, footer)
+
+	var body string
+	if m.editingConnection {
+		// The connection form is a centered popup modal (like LazyCurl's
+		// New Project dialog) instead of a permanently-docked side panel -
+		// list is hidden underneath it while editing, same as the
+		// full-screen help overlay already replaces content elsewhere.
+		modalArea := lipgloss.Place(m.layout.WinWidth, m.layout.BodyHeight, lipgloss.Center, lipgloss.Center, m.form.View())
+		body = lipgloss.JoinVertical(lipgloss.Top, modalArea, footer)
+	} else {
+		listView := m.list.View()
+		body = lipgloss.JoinVertical(lipgloss.Top, listView, footer)
+	}
 
 	// Same panel style as the connected screen (explorer/editor/viewer) -
 	// title embedded directly in the rounded border, matching LazyCurl,
