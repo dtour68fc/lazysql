@@ -338,10 +338,15 @@ func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			// While actively editing a connection, Enter is a "test this
-			// connection right now" shortcut using whatever's currently
-			// typed into the form, jumping straight to the full screen on
-			// success. When NOT editing, Enter is owned by the list
+			// While actively editing a connection, Enter both saves it
+			// (same as pressing 's') AND tests connecting right now,
+			// jumping straight to the full screen on success. Used to
+			// only connect, never save - which meant the connection you
+			// just typed in and successfully connected to never showed up
+			// in the Projects list afterward, only surviving for the rest
+			// of this session. Saving unconditionally (even if the
+			// connect attempt fails) means you don't lose what you typed
+			// either way. When NOT editing, Enter is owned by the list
 			// instead (space/enter on a project row loads its full
 			// database list in place; enter on a specific database row
 			// opens the full screen targeting that database, using the
@@ -351,8 +356,9 @@ func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager
 				m.connecting = true
 				m.editingConnection = false
 				connectionCommand := m.quickConnectFromForm()
+				saveCommand := m.saveConnection()
 				toggleConnectionCommand := m.toggleConnectionEdit()
-				command = tea.Batch(connectionCommand, toggleConnectionCommand)
+				command = tea.Batch(connectionCommand, saveCommand, toggleConnectionCommand)
 			}
 		case "N":
 			// Shift+N: jump straight to a blank "New Connection" and start
