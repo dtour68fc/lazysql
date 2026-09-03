@@ -34,7 +34,14 @@ type Table struct {
 	SelectedRowStyle    lipgloss.Style
 	SelectedColumnStyle lipgloss.Style
 	SelectedCellStyle   lipgloss.Style
-	Viewport            viewport.Model
+	// MarkedStyle colors rows/columns marked with "a" - deliberately a
+	// different color from SelectedRowStyle/SelectedColumnStyle/
+	// SelectedCellStyle (the cursor/hover highlight) so "this is where my
+	// cursor currently is" and "this is what I've marked for the row
+	// view" are visually distinguishable at a glance instead of looking
+	// identical.
+	MarkedStyle lipgloss.Style
+	Viewport    viewport.Model
 
 	// MarkedRows tracks rows marked with "a" for the multi-select vertical
 	// row view ("r") - if empty when "r" is pressed, just the currently
@@ -77,6 +84,7 @@ func InitTable(data [][]string, width int, height int) Table {
 		SelectedRowStyle:    lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
 		SelectedColumnStyle: lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
 		SelectedCellStyle:   lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
+		MarkedStyle:         lipgloss.NewStyle().Background(lipgloss.Color("208")).Foreground(lipgloss.Color("0")),
 		Viewport:            viewport,
 		MarkedRows:          map[int]bool{},
 		MarkedColumns:       map[int]bool{},
@@ -186,7 +194,13 @@ func (t Table) renderColumns() string {
 			Width(t.columnWidths[i]).
 			Padding(0, 1, 0, 1)
 
+		if t.MarkedColumns[i] {
+			style = style.Inherit(t.MarkedStyle)
+		}
 		if i == t.SelectedColumn {
+			// Hover takes precedence over marked - you should always be
+			// able to see where your cursor actually is, even on a
+			// column you've also marked.
 			style = style.Inherit(t.SelectedColumnStyle)
 		}
 		columns = append(columns, style.Render(col))
@@ -200,11 +214,16 @@ func (t Table) renderRows() string {
 		var columns []string
 		for j, cell := range row {
 			style := lipgloss.NewStyle().Width(t.columnWidths[j]).Padding(0, 1, 0, 1)
-			if i == t.SelectedRow && j == t.SelectedColumn {
+			marked := t.MarkedRows[i] || t.MarkedColumns[j]
+			hovered := i == t.SelectedRow || j == t.SelectedColumn
+			switch {
+			case i == t.SelectedRow && j == t.SelectedColumn:
 				style = style.Inherit(t.SelectedCellStyle)
-			} else if i == t.SelectedRow {
+			case marked && !hovered:
+				style = style.Inherit(t.MarkedStyle)
+			case i == t.SelectedRow:
 				style = style.Inherit(t.SelectedRowStyle)
-			} else if j == t.SelectedColumn {
+			case j == t.SelectedColumn:
 				style = style.Inherit(t.SelectedColumnStyle)
 			}
 			columns = append(columns, style.Render(ansi.Truncate(escapeCell(cell), t.columnWidths[j]-2, "…")))
