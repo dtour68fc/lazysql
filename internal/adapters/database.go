@@ -69,17 +69,36 @@ func (c *DbConnection) String(database string) string {
 		c.Username, c.Password, c.Host, c.Port, database)
 }
 
-func (c *DbConnection) InitConnection() (Database, error) {
-	var db *sql.DB
-	var err error
+// healthCheckDatabase resolves which database InitConnection's initial
+// "can we even talk to this server" check should dial. Prefers the
+// connection's own target Database (when set) over the driver's admin db -
+// a user scoped to just their own database (no grants on the admin
+// schema) would otherwise get "Access denied" here on perfectly valid
+// credentials, purely because this handshake picked the wrong database.
+// DBeaver/etc doesn't do this admin-db detour at all, which is why the
+// exact same credentials can work fine there but not here.
+func (c *DbConnection) healthCheckDatabase() (string, error) {
 	var database string
-
 	if c.Driver == "pgx" {
 		database = "postgres"
 	} else if c.Driver == "mysql" {
 		database = "mysql"
 	} else {
-		return nil, fmt.Errorf("unsupported driver: %s", c.Driver)
+		return "", fmt.Errorf("unsupported driver: %s", c.Driver)
+	}
+	if c.Database != "" {
+		database = c.Database
+	}
+	return database, nil
+}
+
+func (c *DbConnection) InitConnection() (Database, error) {
+	var db *sql.DB
+	var err error
+
+	database, err := c.healthCheckDatabase()
+	if err != nil {
+		return nil, err
 	}
 
 	db, err = sql.Open(c.Driver, c.String(database))
