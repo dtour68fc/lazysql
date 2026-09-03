@@ -34,24 +34,15 @@ type ConnectionManager struct {
 	// the user finally opens the full 3-pane screen from the Tables tab.
 	activeDatabase       adapters.Database
 	activeConnectionName string
-	activeDatabaseName   string
-	activeTables         []string
 }
 
 type SelectedConnectionMsg adapters.DbConnection
 type EditConnectionMsg bool
 type ConnectionErrorMsg string
 
-// ConnectedMsg signals a successful connection to AppModel. DatabaseName/
-// Tables are only populated when opened from an already-loaded Tables tab
-// preview (see OpenActiveConnectionMsg) - lets Explorer open pre-expanded to
-// that database instead of re-fetching everything from scratch. Empty for
-// the "quick connect while editing the form" path, which never previewed
-// anything first.
+// ConnectedMsg signals a successful connection to AppModel.
 type ConnectedMsg struct {
-	Database     adapters.Database
-	DatabaseName string
-	Tables       []string
+	Database adapters.Database
 }
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
@@ -64,9 +55,9 @@ func setLayout(width int, height int) tea.Cmd {
 }
 
 // quickConnectFromForm connects using whatever's currently typed into the
-// form (used only while actively editing a connection, as a "test this
-// connection right now" shortcut) and jumps straight to the full 3-pane
-// screen on success.
+// form (used while actively editing a connection, as a "test this
+// connection right now" shortcut) and jumps straight to the full screen on
+// success.
 func (m ConnectionManager) quickConnectFromForm() tea.Cmd {
 	form := m.form.(ConnectionForm)
 	connection := form.toDbConnection()
@@ -101,7 +92,7 @@ func (m ConnectionManager) loadTablesForProject(conn adapters.DbConnection) tea.
 		if err != nil {
 			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
 		}
-		return TablesLoadedMsgInternal{ProjectName: conn.Name, DatabaseName: databases[0], Database: database, Tables: tables}
+		return TablesLoadedMsgInternal{ProjectName: conn.Name, Database: database, Tables: tables}
 	}
 }
 
@@ -110,10 +101,9 @@ func (m ConnectionManager) loadTablesForProject(conn adapters.DbConnection) tea.
 // cycle concern - it's kept in ConnectionManager instead) alongside the
 // fetch result.
 type TablesLoadedMsgInternal struct {
-	ProjectName  string
-	DatabaseName string
-	Database     adapters.Database
-	Tables       []string
+	ProjectName string
+	Database    adapters.Database
+	Tables      []string
 }
 type TablesErrorMsgInternal struct {
 	ProjectName string
@@ -220,8 +210,6 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TablesLoadedMsgInternal:
 		m.activeDatabase = msg.Database
 		m.activeConnectionName = msg.ProjectName
-		m.activeDatabaseName = msg.DatabaseName
-		m.activeTables = msg.Tables
 		command = func() tea.Msg {
 			return TablesStateMsg{ProjectName: msg.ProjectName, Tables: msg.Tables}
 		}
@@ -232,10 +220,8 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case OpenActiveConnectionMsg:
 		if m.activeDatabase != nil {
 			db := m.activeDatabase
-			dbName := m.activeDatabaseName
-			tables := m.activeTables
 			command = func() tea.Msg {
-				return ConnectedMsg{Database: db, DatabaseName: dbName, Tables: tables}
+				return ConnectedMsg{Database: db}
 			}
 		}
 	}
@@ -259,8 +245,7 @@ func (m ConnectionManager) View() string {
 
 // RenderPanel renders just the bordered "Connection Manager" box itself,
 // without centering it on the full screen - used by AppModel to hang it on
-// the left side alongside empty Editor/Viewer placeholder panels, the same
-// way the connected screen hangs Explorer on the left of Editor/Viewer.
+// the left side alongside empty Editor/Viewer placeholder panels.
 func (m ConnectionManager) RenderPanel() string {
 	footer := m.buildFooter()
 
@@ -277,10 +262,9 @@ func (m ConnectionManager) RenderPanel() string {
 		body = lipgloss.JoinVertical(lipgloss.Top, listView, footer)
 	}
 
-	// Same panel style as the connected screen (explorer/editor/viewer) -
-	// title embedded directly in the rounded border, matching LazyCurl,
-	// instead of a separate "Connection Manager" text line + rule inside a
-	// plain box.
+	// Same panel style as the connected screen (editor/viewer) - title
+	// embedded directly in the rounded border, matching LazyCurl, instead
+	// of a separate "Connection Manager" text line + rule inside a plain box.
 	return utils.RenderPanel("Connection Manager", body, m.layout.WinWidth, m.layout.WinHeight, true)
 }
 

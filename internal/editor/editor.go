@@ -87,5 +87,5 @@ func (m EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m EditorModel) View() string {
-	return utils.RenderPanel("2 Editor", m.editor.View(), m.layout.EditorWidth, m.layout.EditorHeight, m.isActive)
+	return utils.RenderPanel("1 Editor", m.editor.View(), m.layout.EditorWidth, m.layout.EditorHeight, m.isActive)
 }

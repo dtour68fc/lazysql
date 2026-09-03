@@ -55,7 +55,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case conn_manager.ConnectedMsg:
-		m.connectionContainer = InitConnectionContainer(msg.Database, msg.DatabaseName, msg.Tables)
+		m.connectionContainer = InitConnectionContainer(msg.Database)
 		m.showingContainer = true
 		return m, m.connectionContainer.Init()
 	}
@@ -84,7 +84,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m AppModel) View() string {
 	if m.showingContainer && m.connectionContainer != nil {
 		// Already connected - ConnectionContainerModel renders its own
-		// full 3-pane (explorer/editor/viewer) layout.
+		// full Editor/Viewer layout.
 		return m.connectionContainer.View()
 	}
 
@@ -96,29 +96,29 @@ func (m AppModel) View() string {
 }
 
 // renderPreConnectLayout hangs the Connection Manager panel on the left,
-// same as Explorer sits on the left of the connected screen, with empty
-// Editor/Viewer placeholder panels on the right showing there's no query or
-// data yet - so the app looks like its final 3-pane layout from the moment
-// it starts, instead of a single box floating in the middle of the screen.
+// with empty Editor/Viewer placeholder panels on the right showing there's
+// no query or data yet - so the app looks like its final layout from the
+// moment it starts, instead of a single box floating in the middle of the
+// screen.
 func (m AppModel) renderPreConnectLayout(cm conn_manager.ConnectionManager) string {
 	left := cm.RenderPanel()
 	panelHeight := cm.PanelHeight()
 
 	rightWidth := m.width - cm.PanelWidth()
-	if rightWidth < utils.EXPLORER_MIN_WIDTH {
-		rightWidth = utils.EXPLORER_MIN_WIDTH
+	if rightWidth < 20 {
+		rightWidth = 20
 	}
 
 	editorHeight := panelHeight * 25 / 100
 	viewerHeight := panelHeight - editorHeight
 
 	editorPlaceholder := utils.RenderPanel(
-		"2 Editor",
+		"1 Editor",
 		"No connection yet.\n\nConnect to a database (left) to start writing a query.",
 		rightWidth, editorHeight, false,
 	)
 	viewerPlaceholder := utils.RenderPanel(
-		"3 Viewer",
+		"2 Viewer",
 		"No data yet.",
 		rightWidth, viewerHeight, false,
 	)

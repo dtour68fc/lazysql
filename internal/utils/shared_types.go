@@ -21,13 +21,11 @@ type ConnectionManagerLayout struct {
 }
 
 type ConnectionContainerLayout struct {
-	ScreenWidth    int
-	ScreenHeight   int
-	EditorWidth    int
-	EditorHeight   int
-	ViewerWidth    int
-	ViewerHeight   int
-	ExplorerWidth  int
-	ExplorerHeight int
-	FooterHeight   int
+	ScreenWidth  int
+	ScreenHeight int
+	EditorWidth  int
+	EditorHeight int
+	ViewerWidth  int
+	ViewerHeight int
+	FooterHeight int
 }
