@@ -57,6 +57,13 @@ type ConnectedMsg struct {
 	// OpenTableMsg) to jump straight to its "SELECT *" results, same as
 	// opening a file in a netrw/oil.nvim style explorer.
 	AutoRunQuery string
+	// KeepManagerFocused, when true, tells AppModel to make the
+	// editor/viewer live in the background without stealing focus away
+	// from the Connection Manager pane - used when picking a PROJECT
+	// (not yet a specific table), so you stay put browsing Databases
+	// instead of getting bounced to a blank editor before you've even
+	// looked at what's there.
+	KeepManagerFocused bool
 }
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
@@ -251,13 +258,20 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// shortcut never did - you'd end up connected with a live editor,
 		// but Databases staying empty/locked forever since nothing ever
 		// told it what was connected). Reuses the already-live Database -
-		// no need to reconnect just to list them.
+		// no need to reconnect just to list them. Skipped when we already
+		// have this exact project's database list loaded (picking a
+		// project, then a table, then another table from the same
+		// project all re-fire ConnectedMsg - no need to redo the fetch
+		// and flicker the Databases tab back to "Loading..." every time).
+		alreadyLoaded := m.activeConnectionName == msg.ProjectName && m.activeDatabase != nil
 		m.activeDatabase = msg.Database
 		m.activeConnectionName = msg.ProjectName
-		loadingMsgCmd := func() tea.Msg {
-			return DatabasesStateMsg{Loading: true, ProjectName: msg.ProjectName}
+		if !alreadyLoaded {
+			loadingMsgCmd := func() tea.Msg {
+				return DatabasesStateMsg{Loading: true, ProjectName: msg.ProjectName}
+			}
+			command = tea.Batch(loadingMsgCmd, fetchDatabasesForLiveConnection(msg.ProjectName, msg.Database))
 		}
-		command = tea.Batch(loadingMsgCmd, fetchDatabasesForLiveConnection(msg.ProjectName, msg.Database))
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
 	case SavedConnectionsLoaded:
@@ -276,9 +290,21 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case DatabasesLoadedMsgInternal:
 		m.activeDatabase = msg.Database
 		m.activeConnectionName = msg.ProjectName
-		command = func() tea.Msg {
+		databasesCmd := func() tea.Msg {
 			return DatabasesStateMsg{ProjectName: msg.ProjectName, Databases: msg.Databases}
 		}
+		// Picking a project already connects under the hood (to be able
+		// to fetch its database list) - it used to stop there, leaving
+		// the editor/viewer stuck on "No connection yet" placeholders
+		// until you drilled all the way down to a specific table. Now
+		// that the connection is proven live (databases fetched
+		// successfully), make the editor/viewer live too, right away -
+		// KeepManagerFocused so you're not yanked away from the
+		// Databases tab you just opened.
+		connectedCmd := func() tea.Msg {
+			return ConnectedMsg{Database: msg.Database, ProjectName: msg.ProjectName, KeepManagerFocused: true}
+		}
+		command = tea.Batch(databasesCmd, connectedCmd)
 	case DatabasesErrorMsgInternal:
 		command = func() tea.Msg {
 			return DatabasesStateMsg{Err: msg.Err, ProjectName: msg.ProjectName}

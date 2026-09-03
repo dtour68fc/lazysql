@@ -83,7 +83,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case conn_manager.ConnectedMsg:
 		cc := InitConnectionContainer(msg.Database, msg.AutoRunQuery)
 		m.connectionContainer = &cc
-		m.activePane = "editor"
+		nextPane := "editor"
+		if msg.KeepManagerFocused {
+			nextPane = m.activePane
+		}
+		m.activePane = nextPane
 		var sizeCmd tea.Cmd
 		if m.width > 0 {
 			updated, cmd := m.connectionContainer.Update(tea.WindowSizeMsg{Width: m.rightWidth(), Height: m.height})
@@ -99,7 +103,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// bounced straight into the (now live) editor.
 		updatedCM, cmCmd := m.connectionManager.Update(msg)
 		m.connectionManager = updatedCM.(conn_manager.ConnectionManager)
-		return m, tea.Batch(m.connectionContainer.Init(), sizeCmd, m.applyActiveViewChangedCmd("editor"), cmCmd)
+		return m, tea.Batch(m.connectionContainer.Init(), sizeCmd, m.applyActiveViewChangedCmd(nextPane), cmCmd)
 	}
 
 	return m.routeToActivePane(msg)
