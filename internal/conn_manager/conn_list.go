@@ -364,7 +364,7 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd = m.changeSelectedConnection(m.selectedConnectionIndex)
 			}
 			m.viewport.SetContent(m.contentUI())
-		case "esc", "h":
+		case "esc", "h", "left":
 			// Pop back out of the tables drill-down to the database list,
 			// same as backing out of a directory in a file explorer.
 			// Doesn't touch the Projects tab or the Databases/Projects
@@ -384,7 +384,12 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeTab = "databases"
 			}
 			m.viewport.SetContent(m.contentUI())
-		case "enter", " ":
+		case "enter", " ", "l", "right":
+			// "l"/"right" are netrw/oil.nvim-style "go into" alternatives
+			// to enter/space - "h"/"left"/esc above is the matching "go
+			// back" direction. Shift+H/Shift+L (a different, capitalized
+			// key) still owns switching the Projects/Databases tabs
+			// itself, no conflict.
 			if m.activeTab == "projects" && m.hasRealConnections {
 				rows := m.projectRows()
 				if m.selectedConnectionIndex >= 0 && m.selectedConnectionIndex < len(m.connections) {

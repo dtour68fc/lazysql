@@ -71,21 +71,21 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "l":
+		case "l", "right":
 			if t.SelectedColumn < len(t.Columns)-1 {
 				t.Viewport.ScrollRight(t.selectedColumnWidth())
 				t.SelectedColumn++
 			}
-		case "h":
+		case "h", "left":
 			if t.SelectedColumn > 0 {
 				t.SelectedColumn--
 				t.Viewport.ScrollLeft(t.selectedColumnWidth())
 			}
-		case "j":
+		case "j", "down":
 			if t.SelectedRow < len(t.Rows)-1 {
 				t.SelectedRow++
 			}
-		case "k":
+		case "k", "up":
 			if t.SelectedRow > 0 {
 				t.SelectedRow--
 			}
