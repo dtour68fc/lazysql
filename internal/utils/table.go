@@ -40,6 +40,12 @@ type Table struct {
 	// row view ("r") - if empty when "r" is pressed, just the currently
 	// hovered row is shown instead.
 	MarkedRows map[int]bool
+	// MarkedColumns tracks columns marked with "a" (alongside the row
+	// under the cursor - "a" marks both at once) - if empty when "r" is
+	// pressed, every column is shown instead of just some of them. Lets
+	// you narrow the vertical row view down to only the fields you
+	// actually care about instead of every column in the row.
+	MarkedColumns map[int]bool
 	// RowView, when true, renders the marked (or just hovered) row(s)
 	// vertically as field: value pairs instead of the normal grid - like
 	// psql's \x / expanded display, for rows too wide/many-columned to
@@ -73,6 +79,7 @@ func InitTable(data [][]string, width int, height int) Table {
 		SelectedCellStyle:   lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
 		Viewport:            viewport,
 		MarkedRows:          map[int]bool{},
+		MarkedColumns:       map[int]bool{},
 		columnWidths:        calculateColumnWidths(cols, rows),
 	}
 	content := table.renderColumns() + "\n" + table.renderRows()
@@ -104,14 +111,23 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 				t.SelectedRow--
 			}
 		case "a":
-			// Mark/unmark the hovered row for the multi-row vertical view
-			// ("r") - if no rows are marked when you press r, it just
-			// shows whichever one is currently hovered instead.
+			// Mark/unmark the hovered row AND column, for the multi-select
+			// vertical view ("r") - if no rows are marked when you press
+			// r, it just shows whichever one is currently hovered
+			// instead; same idea for columns, showing every column
+			// instead of just some of them.
 			if len(t.Rows) > 0 {
 				if t.MarkedRows[t.SelectedRow] {
 					delete(t.MarkedRows, t.SelectedRow)
 				} else {
 					t.MarkedRows[t.SelectedRow] = true
+				}
+			}
+			if len(t.Columns) > 0 {
+				if t.MarkedColumns[t.SelectedColumn] {
+					delete(t.MarkedColumns, t.SelectedColumn)
+				} else {
+					t.MarkedColumns[t.SelectedColumn] = true
 				}
 			}
 		case "r":
@@ -263,6 +279,26 @@ func (t Table) rowViewRows() []int {
 	return rows
 }
 
+// rowViewColumns returns which column indices renderRowView should show:
+// every marked column (in original order) if any are marked, otherwise
+// every column - same "marked, else fall back to everything" rule as
+// rowViewRows.
+func (t Table) rowViewColumns() []int {
+	if len(t.MarkedColumns) == 0 {
+		cols := make([]int, len(t.Columns))
+		for i := range t.Columns {
+			cols[i] = i
+		}
+		return cols
+	}
+	cols := make([]int, 0, len(t.MarkedColumns))
+	for i := range t.MarkedColumns {
+		cols = append(cols, i)
+	}
+	sort.Ints(cols)
+	return cols
+}
+
 // renderRowView renders the selected/marked row(s) vertically as
 // "column: value" pairs (like psql's \x expanded display) instead of the
 // normal side-by-side grid - useful once a row has more columns than
@@ -272,12 +308,14 @@ func (t Table) renderRowView() string {
 	if len(rowIndices) == 0 {
 		return ""
 	}
+	colIndices := t.rowViewColumns()
 	labelStyle := t.ColumnsStyle
 	var blocks []string
 	for _, rowIdx := range rowIndices {
 		row := t.Rows[rowIdx]
 		var lines []string
-		for colIdx, col := range t.Columns {
+		for _, colIdx := range colIndices {
+			col := t.Columns[colIdx]
 			value := ""
 			if colIdx < len(row) {
 				value = row[colIdx]
