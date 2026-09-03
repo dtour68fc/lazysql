@@ -373,11 +373,12 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.inTables = false
 				m.viewport.SetContent(m.contentUI())
 			}
-		case "H", "L":
+		case "H", "L", "shift+left", "shift+right":
 			// Shift+H/Shift+L switch Projects/Databases sub-tabs, matching
 			// LazyCurl's Shift+H/L Collections/Envs convention. Plain tab
 			// is reserved globally for cycling between the Projects/
-			// Editor/Viewer panes instead (see AppModel).
+			// Editor/Viewer panes instead (see AppModel). Shift+Left/
+			// Shift+Right are the arrow-key equivalent of the same switch.
 			if m.activeTab == "databases" {
 				m.activeTab = "projects"
 			} else {
