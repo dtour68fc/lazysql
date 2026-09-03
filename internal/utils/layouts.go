@@ -13,7 +13,11 @@ func CalculateConnectionManagerLayout(width int, height int) ConnectionManagerLa
 	footerHeight := 3
 
 	widths := []int{CONNECTION_MANAGER_MIN_WIDTH, width / 3}
-	heights := []int{CONNECTION_MANAGER_MIN_HEIGHT, height / 3}
+	// Fill the full available height (previously height/3, which left the
+	// panel much shorter than the terminal with empty space above/below it
+	// once AppModel started composing it alongside the Editor/Viewer
+	// placeholders - it should vertically fill the window like they do.
+	heights := []int{CONNECTION_MANAGER_MIN_HEIGHT, height}
 	winWidth := slices.Max(widths)
 	winHeight := slices.Max(heights)
 	listWidth := winWidth / 3

@@ -72,7 +72,7 @@ func (m AppModel) renderPreConnectLayout(cm conn_manager.ConnectionManager) stri
 		rightWidth = utils.EXPLORER_MIN_WIDTH
 	}
 
-	editorHeight := panelHeight / 2
+	editorHeight := panelHeight * 25 / 100
 	viewerHeight := panelHeight - editorHeight
 
 	editorPlaceholder := utils.RenderPanel(
@@ -92,5 +92,9 @@ func (m AppModel) renderPreConnectLayout(cm conn_manager.ConnectionManager) stri
 	if m.width <= 0 || m.height <= 0 {
 		return body
 	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Center, body)
+	// Top-aligned rather than centered - the panel now fills the full
+	// available height itself, so there's nothing left to center; Top
+	// keeps any rounding-error slack (e.g. tiny terminals hitting the
+	// MIN_HEIGHT floor) at the bottom instead of splitting it top/bottom.
+	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, body)
 }
