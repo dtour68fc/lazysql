@@ -65,7 +65,12 @@ func (p *Postgres) execute(database string, query string, params ...any) (*sql.R
 }
 
 func (p *Postgres) GetDatabases() ([]string, error) {
-	rows, err := p.execute("postgres", "SELECT datname FROM pg_database WHERE NOT datistemplate;")
+	// pg_database is a global catalog visible from any database you can
+	// connect to - hardcoding "postgres" here meant a user scoped to just
+	// their own database (no grant to even connect to "postgres" at all)
+	// got denied trying to list databases, even though listing them
+	// never actually required connecting to "postgres" specifically.
+	rows, err := p.execute(p.currentDatabase, "SELECT datname FROM pg_database WHERE NOT datistemplate;")
 	if err != nil {
 		return nil, err
 	}

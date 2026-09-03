@@ -83,11 +83,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case conn_manager.ConnectedMsg:
 		cc := InitConnectionContainer(msg.Database, msg.AutoRunQuery)
 		m.connectionContainer = &cc
-		nextPane := "editor"
-		if msg.KeepManagerFocused {
-			nextPane = m.activePane
-		}
-		m.activePane = nextPane
+		// Never yank focus onto the editor just because a connection
+		// succeeded (whether that's picking a project, opening a table,
+		// or quick-connecting from the form) - the editor/viewer go live
+		// in the background, but you stay wherever you already were and
+		// jump over yourself with 2/tab whenever you're ready.
+		nextPane := m.activePane
 		var sizeCmd tea.Cmd
 		if m.width > 0 {
 			updated, cmd := m.connectionContainer.Update(tea.WindowSizeMsg{Width: m.rightWidth(), Height: m.height})

@@ -63,7 +63,14 @@ func (m *Mysql) execute(database string, query string, params ...any) (*sql.Rows
 }
 
 func (m *Mysql) GetDatabases() ([]string, error) {
-	rows, err := m.execute("mysql", "SHOW DATABASES;")
+	// SHOW DATABASES doesn't need to be run "against" the admin schema
+	// specifically - it's a server-level command that works from
+	// whatever database you're already connected to. Hardcoding "mysql"
+	// here meant a user scoped to just their own database (no grants on
+	// the admin schema at all) got denied trying to list databases,
+	// even though listing them never actually required being in "mysql"
+	// in the first place.
+	rows, err := m.execute(m.currentDatabase, "SHOW DATABASES;")
 	if err != nil {
 		return nil, err
 	}

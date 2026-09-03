@@ -57,13 +57,6 @@ type ConnectedMsg struct {
 	// OpenTableMsg) to jump straight to its "SELECT *" results, same as
 	// opening a file in a netrw/oil.nvim style explorer.
 	AutoRunQuery string
-	// KeepManagerFocused, when true, tells AppModel to make the
-	// editor/viewer live in the background without stealing focus away
-	// from the Connection Manager pane - used when picking a PROJECT
-	// (not yet a specific table), so you stay put browsing Databases
-	// instead of getting bounced to a blank editor before you've even
-	// looked at what's there.
-	KeepManagerFocused bool
 }
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
@@ -298,11 +291,12 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// the editor/viewer stuck on "No connection yet" placeholders
 		// until you drilled all the way down to a specific table. Now
 		// that the connection is proven live (databases fetched
-		// successfully), make the editor/viewer live too, right away -
-		// KeepManagerFocused so you're not yanked away from the
-		// Databases tab you just opened.
+		// successfully), make the editor/viewer live too, right away.
+		// AppModel never steals focus on ConnectedMsg regardless of
+		// which of the connect paths fired it, so this doesn't yank you
+		// off the Databases tab you just opened either.
 		connectedCmd := func() tea.Msg {
-			return ConnectedMsg{Database: msg.Database, ProjectName: msg.ProjectName, KeepManagerFocused: true}
+			return ConnectedMsg{Database: msg.Database, ProjectName: msg.ProjectName}
 		}
 		command = tea.Batch(databasesCmd, connectedCmd)
 	case DatabasesErrorMsgInternal:
