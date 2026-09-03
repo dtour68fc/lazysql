@@ -4,14 +4,18 @@ import (
 	"slices"
 )
 
-var CONNECTION_MANAGER_MIN_WIDTH = 84
+// Halved from 84/3 - the Connection Manager panel (Projects/Databases) was
+// eating a full third of the screen, way more than it needs for a list of
+// names, leaving the Editor/Viewer cramped. Editor/Viewer pick up
+// whatever this gives back (see AppModel.rightWidth()).
+var CONNECTION_MANAGER_MIN_WIDTH = 42
 var CONNECTION_MANAGER_MIN_HEIGHT = 32
 
 func CalculateConnectionManagerLayout(width int, height int) ConnectionManagerLayout {
 	headerHeight := 3
 	footerHeight := 3
 
-	widths := []int{CONNECTION_MANAGER_MIN_WIDTH, width / 3}
+	widths := []int{CONNECTION_MANAGER_MIN_WIDTH, width / 6}
 	// Fill the full available height (previously height/3, which left the
 	// panel much shorter than the terminal with empty space above/below it
 	// once AppModel started composing it alongside the Editor/Viewer

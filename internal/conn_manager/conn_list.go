@@ -399,6 +399,18 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Connection placeholder row.
 					isPlaceholder := selected.Name == "New Connection" && selected.Host == ""
 					if !isPlaceholder && len(rows) > 0 {
+						// Switch straight to the Databases tab so you see
+						// the (loading -> loaded) list land, instead of
+						// having to separately hit shift+l/shift+right to
+						// go look for it yourself. Optimistically mark it
+						// loading right away too - otherwise there's a
+						// one-frame flash of the "locked, select a
+						// project" message before the async
+						// DatabasesStateMsg{Loading:true} actually arrives.
+						m.activeTab = "databases"
+						m.databasesLoading = true
+						m.databasesProjectName = selected.Name
+						m.viewport.SetContent(m.contentUI())
 						cmd = func() tea.Msg { return LoadDatabasesMsg(selected) }
 					}
 				}
