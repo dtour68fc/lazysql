@@ -11,10 +11,14 @@ import (
 // stripped by vimtea before we ever see it, clauses after the first are
 // separated by " :"):
 //
-// Select head (either form), with an optional alias:
+// Select head (either form), with an optional alias. The table itself is
+// also optional - when omitted, it defaults to currentTable (whatever
+// table you're currently looking at, e.g. from picking one in the
+// Databases tab's drill-down), so plain ":sa" works without retyping the
+// table name every time:
 //
-//	sa <table> [as <alias>]                -> SELECT * FROM <table> [AS <alias>]
-//	s(col1,col2,...) <table> [as <alias>]  -> SELECT col1, col2 FROM <table> [AS <alias>]
+//	sa [table] [as <alias>]                -> SELECT * FROM <table> [AS <alias>]
+//	s(col1,col2,...) [table] [as <alias>]  -> SELECT col1, col2 FROM <table> [AS <alias>]
 //
 // Chained onto a select head, in any order, any number of times:
 //
@@ -27,32 +31,54 @@ import (
 // (guessing wrong silently is worse than not guessing at all) - it seeds a
 // TODO placeholder instead and autoRun comes back false, so you get a
 // buffer to finish rather than a query fired off with a broken or
-// accidental cross-join condition.
+// accidental cross-join condition. Join tables are always required
+// explicitly (no default) - you're deliberately naming a different table.
 //
 // Standalone heads (no chaining with the above - each is a complete
-// statement on its own):
+// statement on its own), table optional same as the select heads:
 //
-//	d <table>            -> DELETE FROM <table>
-//	d <table> :w <cond>  -> DELETE FROM <table> WHERE <cond> (multiple :w AND together)
-//	i <table>(col=val,...) -> INSERT INTO <table> (col, ...) VALUES (val, ...)
-func parseShorthandQuery(raw string) (query string, autoRun bool, ok bool) {
+//	d [table]            -> DELETE FROM <table>
+//	d [table] :w <cond>  -> DELETE FROM <table> WHERE <cond> (multiple :w AND together)
+//	i [table](col=val,...) -> INSERT INTO <table> (col, ...) VALUES (val, ...)
+//
+// resolvedTable is whatever table the query ended up targeting (whether
+// you typed it or it came from currentTable) - the caller should feed this
+// back in as currentTable next time, so it tracks whatever you're actually
+// looking at even as you switch tables.
+func parseShorthandQuery(raw string, currentTable string) (query string, autoRun bool, resolvedTable string, ok bool) {
 	clauses := strings.Split(raw, " :")
 	if len(clauses) == 0 {
-		return "", false, false
+		return "", false, "", false
 	}
 	head := strings.TrimSpace(clauses[0])
 	rest := clauses[1:]
 
 	if m := deleteRe.FindStringSubmatch(head); m != nil {
-		return parseDeleteClauses(m[1], rest)
+		table := firstNonEmpty(m[1], currentTable)
+		if table == "" {
+			return "", false, "", false
+		}
+		q, run, ok := parseDeleteClauses(table, rest)
+		return q, run, table, ok
 	}
 	if m := insertRe.FindStringSubmatch(head); m != nil {
-		if len(rest) > 0 {
-			return "", false, false
+		table := firstNonEmpty(m[1], currentTable)
+		if table == "" || len(rest) > 0 {
+			return "", false, "", false
 		}
-		return parseInsert(m[1], m[2])
+		q, run, ok := parseInsert(table, m[2])
+		return q, run, table, ok
 	}
-	return parseSelectClauses(head, rest)
+	return parseSelectClauses(head, rest, currentTable)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func parseDeleteClauses(table string, rest []string) (query string, autoRun bool, ok bool) {
@@ -90,11 +116,14 @@ func parseInsert(table string, assignments string) (query string, autoRun bool, 
 	return base + ";", true, true
 }
 
-func parseSelectClauses(head string, rest []string) (query string, autoRun bool, ok bool) {
+func parseSelectClauses(head string, rest []string, currentTable string) (query string, autoRun bool, resolvedTable string, ok bool) {
 	var base, fromTable string
 
 	if m := selectAllRe.FindStringSubmatch(head); m != nil {
-		fromTable = m[1]
+		fromTable = firstNonEmpty(m[1], currentTable)
+		if fromTable == "" {
+			return "", false, "", false
+		}
 		base = fmt.Sprintf("SELECT * FROM %s", fromTable)
 		if m[2] != "" {
 			base += " AS " + m[2]
@@ -104,13 +133,16 @@ func parseSelectClauses(head string, rest []string) (query string, autoRun bool,
 		for i, c := range cols {
 			cols[i] = strings.TrimSpace(c)
 		}
-		fromTable = m[2]
+		fromTable = firstNonEmpty(m[2], currentTable)
+		if fromTable == "" {
+			return "", false, "", false
+		}
 		base = fmt.Sprintf("SELECT %s FROM %s", strings.Join(cols, ", "), fromTable)
 		if m[3] != "" {
 			base += " AS " + m[3]
 		}
 	} else {
-		return "", false, false
+		return "", false, "", false
 	}
 
 	autoRun = true
@@ -141,20 +173,20 @@ func parseSelectClauses(head string, rest []string) (query string, autoRun bool,
 		}
 		// Not a recognized :j/:lj/:w clause - bail rather than silently
 		// dropping something you typed.
-		return "", false, false
+		return "", false, "", false
 	}
 	if len(whereConds) > 0 {
 		base += " WHERE " + strings.Join(whereConds, " AND ")
 	}
 
-	return base + ";", autoRun, true
+	return base + ";", autoRun, fromTable, true
 }
 
 var (
-	selectAllRe  = regexp.MustCompile(`^sa\s+(\S+?)(?:\s+as\s+(\S+))?$`)
-	selectColsRe = regexp.MustCompile(`^s\(([^)]+)\)\s+(\S+?)(?:\s+as\s+(\S+))?$`)
+	selectAllRe  = regexp.MustCompile(`^sa(?:\s+(\S+?))?(?:\s+as\s+(\S+))?$`)
+	selectColsRe = regexp.MustCompile(`^s\(([^)]+)\)(?:\s+(\S+?))?(?:\s+as\s+(\S+))?$`)
 	joinRe       = regexp.MustCompile(`^(lj|j)\s+(\S+?)(?:\s+as\s+(\S+))?(?:\s+on\s+(\S+)=(\S+))?$`)
 	whereRe      = regexp.MustCompile(`^w\s+(.+)$`)
-	deleteRe     = regexp.MustCompile(`^d\s+(\S+)$`)
-	insertRe     = regexp.MustCompile(`^i\s+(\S+)\(([^)]+)\)$`)
+	deleteRe     = regexp.MustCompile(`^d(?:\s+(\S+))?$`)
+	insertRe     = regexp.MustCompile(`^i(?:\s+(\S+?))?\(([^)]+)\)$`)
 )

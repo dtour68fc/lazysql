@@ -24,6 +24,13 @@ type EditorModel struct {
 	editor       vimtea.Editor
 	runQuery     func(text string) tea.Cmd
 	initialQuery string
+	// currentTable is whatever table the query shorthand DSL should
+	// default to when you don't type one explicitly (e.g. plain ":sa"
+	// instead of ":sa users") - seeded from picking a table in the
+	// Databases tab's drill-down, and updated any time a shorthand query
+	// resolves a table (whether you typed it or it came from this same
+	// default), so it tracks whatever you're actually looking at.
+	currentTable string
 }
 
 // InitEditor builds the editor. initialQuery, when non-empty, seeds the
@@ -31,7 +38,8 @@ type EditorModel struct {
 // in the Databases tab's drill-down) AND runs it immediately on Init() -
 // same affordance as netrw/oil.nvim opening a file the moment you select
 // it, instead of making you retype/re-trigger the query yourself.
-func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayout, initialQuery string) EditorModel {
+// currentTable seeds the shorthand DSL's default table (see EditorModel).
+func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayout, initialQuery string, currentTable string) EditorModel {
 	editorOpts := []vimtea.EditorOption{
 		vimtea.WithEnableStatusBar(true),
 		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("255"))),
@@ -74,6 +82,7 @@ func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayo
 		editor:       editor,
 		runQuery:     runQuery,
 		initialQuery: initialQuery,
+		currentTable: currentTable,
 	}
 }
 
@@ -107,10 +116,13 @@ func (m EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Anything that doesn't match just falls through to vimtea's own
 		// handling below (which will show "Unknown command" for genuine
 		// typos, same as always).
-		if query, autoRun, ok := parseShorthandQuery(msg.Command); ok {
+		if query, autoRun, resolvedTable, ok := parseShorthandQuery(msg.Command, m.currentTable); ok {
 			buf := m.editor.GetBuffer()
 			buf.Clear()
 			buf.InsertAt(0, 0, query)
+			if resolvedTable != "" {
+				m.currentTable = resolvedTable
+			}
 			if autoRun {
 				cmd = m.runQuery(query)
 			}

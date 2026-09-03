@@ -57,6 +57,11 @@ type ConnectedMsg struct {
 	// OpenTableMsg) to jump straight to its "SELECT *" results, same as
 	// opening a file in a netrw/oil.nvim style explorer.
 	AutoRunQuery string
+	// Table, when non-empty, seeds the editor's "current table" - lets
+	// the query shorthand DSL (":sa", ":d", etc) default to this table
+	// when you don't type one explicitly, e.g. just ":sa" instead of
+	// ":sa users" while you're already looking at users.
+	Table string
 }
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
@@ -323,6 +328,7 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					ProjectName:  name,
 					DatabaseName: dbName,
 					AutoRunQuery: fmt.Sprintf("SELECT * FROM %s;", tableName),
+					Table:        tableName,
 				}
 			}
 		}

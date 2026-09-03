@@ -81,7 +81,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case conn_manager.ConnectedMsg:
-		cc := InitConnectionContainer(msg.Database, msg.AutoRunQuery)
+		cc := InitConnectionContainer(msg.Database, msg.AutoRunQuery, msg.Table)
 		m.connectionContainer = &cc
 		// Never yank focus onto the editor just because a connection
 		// succeeded (whether that's picking a project, opening a table,

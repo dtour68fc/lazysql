@@ -24,7 +24,7 @@ type ConnectionContainerModel struct {
 	layout utils.ConnectionContainerLayout
 }
 
-func InitConnectionContainer(database adapters.Database, initialQuery string) ConnectionContainerModel {
+func InitConnectionContainer(database adapters.Database, initialQuery string, currentTable string) ConnectionContainerModel {
 	width, height, err := term.GetSize(int(os.Stdin.Fd()))
 	if err != nil {
 		width = MIN_WIDTH
@@ -33,7 +33,7 @@ func InitConnectionContainer(database adapters.Database, initialQuery string) Co
 
 	layout := utils.CalculateConnectionContainerLayout(width, height)
 	return ConnectionContainerModel{
-		editor: editor.InitEditor(database, layout, initialQuery),
+		editor: editor.InitEditor(database, layout, initialQuery, currentTable),
 		viewer: viewer.InitViewer(database, layout),
 		layout: layout,
 	}
