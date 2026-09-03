@@ -3,6 +3,7 @@ package conn_manager
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -78,6 +79,20 @@ type DumpResultMsg struct {
 	Err  string
 }
 
+// ImportRequestMsg is sent when the user confirms the file path in the
+// Ctrl+I "import .sql" modal - signals ConnectionManager to actually run
+// it (it owns the live adapters.Database connection).
+type ImportRequestMsg struct {
+	FilePath string
+}
+
+// ImportResultMsg reports the outcome of an ImportRequestMsg - shown as a
+// status line in the Databases tab.
+type ImportResultMsg struct {
+	StatementsRun int
+	Err           string
+}
+
 // DatabasesStateMsg pushes the Databases tab's data into ConnectionList -
 // owned and fetched by ConnectionManager (which has the live
 // adapters.Database), but rendered here alongside the Projects list.
@@ -131,6 +146,17 @@ type ConnectionList struct {
 	dumpDatabase string
 	dumpInput    textinput.Model
 	dumpStatus   string
+
+	// Ctrl+I "import .sql" modal - the inverse of Ctrl+D above: a
+	// file-path prompt (not a folder, an actual file this time) for
+	// re-running a previously dumped .sql file against whichever table or
+	// database is currently hovered.
+	importing      bool
+	importKind     string // "table" | "database" - only used to prefill a sensible default filename guess
+	importTable    string
+	importDatabase string
+	importInput    textinput.Model
+	importStatus   string
 }
 
 func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
@@ -205,6 +231,10 @@ func (m ConnectionList) InTablesDrilldown() bool { return m.inTables }
 // would quit the whole app instead, and typing a literal digit or "q" into
 // the folder path would get hijacked instead of typed.
 func (m ConnectionList) IsDumping() bool { return m.dumping }
+
+// IsImporting reports whether the Ctrl+I "import .sql" file-path modal is
+// currently open - same reasoning as IsDumping.
+func (m ConnectionList) IsImporting() bool { return m.importing }
 
 func (m ConnectionList) moveSelection(delta int) int {
 	rows := m.projectRows()
@@ -405,6 +435,25 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.importing {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			switch keyMsg.String() {
+			case "esc":
+				m.importing = false
+				return m, nil
+			case "enter":
+				m.importing = false
+				filePath := m.importInput.Value()
+				req := ImportRequestMsg{FilePath: filePath}
+				return m, func() tea.Msg { return req }
+			}
+			var inputCmd tea.Cmd
+			m.importInput, inputCmd = m.importInput.Update(keyMsg)
+			return m, inputCmd
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -428,6 +477,35 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.dumpInput = newDumpFolderInput()
 				return m, nil
 			}
+		case "ctrl+u":
+			// ctrl+u, not ctrl+i - Ctrl+I and Tab send the literal same
+			// byte (0x09/HT) at the terminal protocol level, completely
+			// indistinguishable from each other in virtually any
+			// terminal, and Tab is already deeply load-bearing here
+			// (global pane-cycling) - binding ctrl+i would have meant
+			// every single Tab press also fired an import. ctrl+u for
+			// "upload", the inverse of ctrl+d.
+			//
+			// Imports a previously dumped .sql file back in, against
+			// whichever table or database is currently hovered (the file
+			// itself decides what actually gets touched, this is just
+			// for a sensible default filename guess).
+			if m.activeTab == "databases" && m.inTables && !m.tablesLoading && len(m.tables) > 0 {
+				m.importKind = "table"
+				m.importTable = m.tables[m.selectedTableIndex]
+				m.importDatabase = m.tablesDatabaseName
+				m.importing = true
+				m.importInput = newImportFileInput(m.importTable)
+				return m, nil
+			} else if m.activeTab == "databases" && !m.inTables && !m.databasesLocked() && len(m.databases) > 0 {
+				m.importKind = "database"
+				m.importDatabase = m.databases[m.selectedDatabaseIndex]
+				m.importTable = ""
+				m.importing = true
+				m.importInput = newImportFileInput(m.importDatabase)
+				return m, nil
+			}
+
 		case "up", "k":
 			if m.activeTab == "databases" && m.inTables && !m.tablesLoading && len(m.tables) > 0 {
 				if m.selectedTableIndex > 0 {
@@ -582,6 +660,13 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.dumpStatus = fmt.Sprintf("Dumped to %s", msg.Path)
 		}
 		m.viewport.SetContent(m.contentUI())
+	case ImportResultMsg:
+		if msg.Err != "" {
+			m.importStatus = fmt.Sprintf("Import failed after %d statement(s): %s", msg.StatementsRun, msg.Err)
+		} else {
+			m.importStatus = fmt.Sprintf("Imported %d statement(s)", msg.StatementsRun)
+		}
+		m.viewport.SetContent(m.contentUI())
 	}
 	m.viewport, viewPortCmd = m.viewport.Update(msg)
 	return m, tea.Batch(cmd, viewPortCmd)
@@ -591,10 +676,16 @@ func (m ConnectionList) View() string {
 	if m.dumping {
 		return fmt.Sprintf("%s\n%s", m.tabsUI(), m.renderDumpModal())
 	}
+	if m.importing {
+		return fmt.Sprintf("%s\n%s", m.tabsUI(), m.renderImportModal())
+	}
 	info := fmt.Sprintf("Current rows: %d\nTotal rows: %d", m.viewport.VisibleLineCount(), m.viewport.TotalLineCount())
 	status := ""
 	if m.dumpStatus != "" {
 		status = "\n" + m.dumpStatus
+	}
+	if m.importStatus != "" {
+		status += "\n" + m.importStatus
 	}
 	return fmt.Sprintf("%s\n%s\n%s%s", m.tabsUI(), m.viewport.View(), info, status)
 }
@@ -606,6 +697,23 @@ func newDumpFolderInput() textinput.Model {
 	dir, err := os.Getwd()
 	if err == nil {
 		input.SetValue(dir)
+	}
+	input.CursorEnd()
+	input.Focus()
+	return input
+}
+
+// newImportFileInput builds the Ctrl+I source-file prompt, prefilled with
+// a guess matching what dumpTable/dumpDatabase would have named the file
+// for this same target (<cwd>/<name>.sql) - not guaranteed to be right,
+// just a reasonable starting point to edit from.
+func newImportFileInput(targetName string) textinput.Model {
+	input := textinput.New()
+	dir, err := os.Getwd()
+	if err == nil {
+		input.SetValue(filepath.Join(dir, targetName+".sql"))
+	} else {
+		input.SetValue(targetName + ".sql")
 	}
 	input.CursorEnd()
 	input.Focus()
@@ -625,4 +733,19 @@ func (m ConnectionList) dumpTargetLabel() string {
 		return m.dumpTable
 	}
 	return m.dumpDatabase
+}
+
+func (m ConnectionList) renderImportModal() string {
+	title := fmt.Sprintf("Import .sql into %s '%s' - choose a file", m.importKind, m.importTargetLabel())
+	box := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2).Width(70)
+	hint := lipgloss.NewStyle().Faint(true).Render("Import (enter)   Cancel (esc)")
+	body := lipgloss.JoinVertical(lipgloss.Left, title, "", m.importInput.View(), "", hint)
+	return box.Render(body)
+}
+
+func (m ConnectionList) importTargetLabel() string {
+	if m.importKind == "table" {
+		return m.importTable
+	}
+	return m.importDatabase
 }

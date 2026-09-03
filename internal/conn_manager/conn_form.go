@@ -197,7 +197,7 @@ func (m ConnectionForm) RenderModal() string {
 	fields := m.renderFieldsForIndexes(indices)
 
 	buttonRow := lipgloss.NewStyle().
-		Width(m.layout.ModalWidth-4).
+		Width(m.layout.ModalWidth - 4).
 		Align(lipgloss.Center).
 		MarginTop(1).
 		Render("Save (s)   Cancel (esc)")

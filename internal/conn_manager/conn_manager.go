@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"time"
 
 	"app.lazygit/internal/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -242,6 +243,20 @@ func (m ConnectionManager) performDump(req DumpRequestMsg) tea.Cmd {
 	}
 }
 
+// performImport runs the actual .sql import (see dump.go's importSQLFile) -
+// kept here rather than in conn_list.go for the same reason as
+// performDump: it needs the live adapters.Database connection.
+func (m ConnectionManager) performImport(req ImportRequestMsg) tea.Cmd {
+	db := m.activeDatabase
+	return func() tea.Msg {
+		ran, err := importSQLFile(db, req.FilePath)
+		if err != nil {
+			return ImportResultMsg{StatementsRun: ran, Err: err.Error()}
+		}
+		return ImportResultMsg{StatementsRun: ran}
+	}
+}
+
 // hasRealConnectionsCmd tells the list whether there are any real saved
 // connections, right after they're (re)loaded.
 func hasRealConnectionsCmd(has bool) tea.Cmd {
@@ -284,6 +299,21 @@ func loadSessionCmd() tea.Cmd {
 		s, _ := loadSession()
 		return SessionLoadedMsg(s)
 	}
+}
+
+// RetryRestoreMsg fires after retryRestoreInterval to re-attempt
+// reconnecting to the session-restore project named by the string, if
+// it's still the one we're trying to restore (a manual reconnect/pick of
+// a different project in the meantime clears pendingRestoreSession, which
+// this checks against before actually retrying).
+type RetryRestoreMsg string
+
+const retryRestoreInterval = 2 * time.Second
+
+func retryRestoreCmd(projectName string) tea.Cmd {
+	return tea.Tick(retryRestoreInterval, func(time.Time) tea.Msg {
+		return RetryRestoreMsg(projectName)
+	})
 }
 
 // tryRestoreSession kicks off reconnecting to the last-used project (and,
@@ -397,12 +427,40 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return OpenTableMsg{DatabaseName: restore.DatabaseName, TableName: restore.TableName}
 			}
 		} else {
+			// Clear it if THIS was the restore target - a restore that
+			// only got as far as "connect to the project" (no specific
+			// table ever saved) is done restoring once we're here, and
+			// leaving pendingRestoreSession set would keep matching this
+			// same project's ProjectName if you ever reconnect to it
+			// again later, uselessly. Don't touch it if this was some
+			// other, unrelated project connecting while a restore for a
+			// DIFFERENT project is still retrying in the background.
+			if m.pendingRestoreSession.ProjectName == msg.ProjectName {
+				m.pendingRestoreSession = SessionState{}
+			}
 			saveSession(SessionState{ProjectName: msg.ProjectName})
 		}
 		command = tea.Batch(databasesCmd, connectedCmd, continueCmd)
 	case DatabasesErrorMsgInternal:
-		command = func() tea.Msg {
+		errCmd := func() tea.Msg {
 			return DatabasesStateMsg{Err: msg.Err, ProjectName: msg.ProjectName}
+		}
+		// If this failure was for the project we're trying to auto-
+		// restore on startup (session.go), don't just give up on the
+		// first failed attempt - the server might just not be reachable
+		// yet this early in boot (slow to come up, network still
+		// settling, etc). Keep retrying on an interval until it actually
+		// connects, instead of silently leaving you on a dead session.
+		var retryCmd tea.Cmd
+		if m.pendingRestoreSession.ProjectName == msg.ProjectName {
+			retryCmd = retryRestoreCmd(msg.ProjectName)
+		}
+		command = tea.Batch(errCmd, retryCmd)
+	case RetryRestoreMsg:
+		if m.pendingRestoreSession.ProjectName == string(msg) {
+			if conn, exists := m.connectionsByName[string(msg)]; exists {
+				command = func() tea.Msg { return LoadDatabasesMsg(conn) }
+			}
 		}
 	case LoadTablesMsg:
 		if m.activeDatabase != nil {
@@ -433,6 +491,10 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.activeDatabase != nil {
 			command = m.performDump(msg)
 		}
+	case ImportRequestMsg:
+		if m.activeDatabase != nil {
+			command = m.performImport(msg)
+		}
 	}
 
 	if !m.editingConnection {
@@ -462,6 +524,11 @@ func (m ConnectionManager) View() string {
 		// instead of centered over the whole screen.
 		if list, ok := m.list.(ConnectionList); ok {
 			return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, list.renderDumpModal())
+		}
+	}
+	if m.IsImporting() {
+		if list, ok := m.list.(ConnectionList); ok {
+			return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, list.renderImportModal())
 		}
 	}
 
@@ -518,6 +585,15 @@ func (m ConnectionManager) IsInTablesDrilldown() bool {
 func (m ConnectionManager) IsDumping() bool {
 	if list, ok := m.list.(ConnectionList); ok {
 		return list.IsDumping()
+	}
+	return false
+}
+
+// IsImporting reports whether the Ctrl+I "import .sql" file-path modal is
+// currently open - see ConnectionList.IsImporting.
+func (m ConnectionManager) IsImporting() bool {
+	if list, ok := m.list.(ConnectionList); ok {
+		return list.IsImporting()
 	}
 	return false
 }

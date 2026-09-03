@@ -61,7 +61,6 @@ func isDefaultPort(port string) bool {
 	return false
 }
 
-
 // driverIndexForValue returns the DriverOptions index matching the given
 // internal driver value, defaulting to 0 if not found (e.g. empty/new form).
 func driverIndexForValue(value string) int {

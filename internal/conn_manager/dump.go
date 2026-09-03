@@ -97,3 +97,29 @@ func dumpDatabase(database adapters.Database, databaseName string, folder string
 	}
 	return path, nil
 }
+
+// importSQLFile re-runs a previously dumped .sql file (table or database,
+// same round-trippable data-only format written by dumpTable/dumpDatabase
+// above) against the given database - one statement per non-comment,
+// non-blank line, matching exactly how those write one complete
+// "INSERT INTO ...;" per line. Stops on the first failing statement rather
+// than silently skipping it, reporting how many ran successfully before
+// that happened.
+func importSQLFile(database adapters.Database, path string) (int, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	ran := 0
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "--") {
+			continue
+		}
+		if _, err := database.RunQuery(line); err != nil {
+			return ran, fmt.Errorf("statement %d: %w", ran+1, err)
+		}
+		ran++
+	}
+	return ran, nil
+}

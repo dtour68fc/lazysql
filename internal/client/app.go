@@ -78,6 +78,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		canJumpPanes := !m.connectionManager.IsEditingConnection() &&
 			!m.connectionManager.IsShowingHelp() &&
 			!m.connectionManager.IsDumping() &&
+			!m.connectionManager.IsImporting() &&
 			!(m.activePane == "editor" && m.connectionContainer != nil && m.connectionContainer.IsEditorCapturingInput()) &&
 			!(m.activePane == "viewer" && m.connectionContainer != nil && m.connectionContainer.IsViewerEditingCell())
 
@@ -291,6 +292,9 @@ func (m AppModel) View() string {
 	if m.connectionManager.IsDumping() {
 		// Same reasoning as IsEditingConnection above - the ctrl+d dump
 		// modal is also ~70 cols, too wide for the narrow panel.
+		return m.connectionManager.View()
+	}
+	if m.connectionManager.IsImporting() {
 		return m.connectionManager.View()
 	}
 

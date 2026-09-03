@@ -15,12 +15,13 @@ func editFooter() string {
 }
 
 func normalFooter() string {
-	return fmt.Sprintf("%s, %s, %s, %s, %s, %s, %s, %s, %s, %s",
+	return fmt.Sprintf("%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s",
 		"Select (enter/space)",
 		"New project (shift+n)",
 		"Edit (e)",
 		"Delete (d)",
 		"Dump to .sql (ctrl+d)",
+		"Import .sql (ctrl+u)",
 		"Save (s)",
 		"Navigate (j,k)",
 		"Back (esc/h)",
