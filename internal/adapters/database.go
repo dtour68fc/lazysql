@@ -1,15 +1,24 @@
 package adapters
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os/exec"
 	"strings"
+	"time"
 
 	"database/sql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/go-sql-driver/mysql"
 )
+
+// connectTimeout bounds how long InitConnection's health-check query is
+// allowed to hang waiting on a slow/unreachable host. Without this, a
+// dead/unreachable connection just hangs the "Connecting..." UI forever
+// with no error at all - the underlying database/sql query had no
+// context/deadline on it whatsoever.
+const connectTimeout = 8 * time.Second
 
 type DbConnection struct {
 	Name     string
@@ -72,9 +81,16 @@ func (c *DbConnection) InitConnection() (Database, error) {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
+	defer cancel()
+
 	var greeting string
-	err = db.QueryRow("select 'Hello, world!'").Scan(&greeting)
+	err = db.QueryRowContext(ctx, "select 'Hello, world!'").Scan(&greeting)
 	if err != nil {
+		db.Close()
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("timed out connecting to %s:%s after %s (host unreachable or too slow to respond)", c.Host, c.Port, connectTimeout)
+		}
 		return nil, err
 	}
 	if c.Driver == "pgx" {
