@@ -9,9 +9,15 @@ import (
 )
 
 type AppModel struct {
-	current_view tea.Model
-	width        int
-	height       int
+	// connectionManager stays alive for the whole program run (never
+	// destroyed on connect) so switching back to it with ctrl+p restores
+	// exactly where you left off - same Projects list, same loaded Tables
+	// tab state - instead of losing it and starting over.
+	connectionManager   tea.Model
+	connectionContainer tea.Model // nil until a connection succeeds at least once
+	showingContainer    bool
+	width               int
+	height              int
 }
 
 func StartApp() {
@@ -20,17 +26,15 @@ func StartApp() {
 
 func initModel() AppModel {
 	return AppModel{
-		current_view: conn_manager.InitConnectionManager(),
+		connectionManager: conn_manager.InitConnectionManager(),
 	}
 }
 
 func (m AppModel) Init() tea.Cmd {
-	return m.current_view.Init()
+	return m.connectionManager.Init()
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.current_view, cmd = m.current_view.Update(msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -39,23 +43,58 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+p":
+			// Switch back to the Projects list (Connection Manager)
+			// without losing it or the connected screen - go pick a
+			// different connection, or ctrl+p again... actually there's
+			// no need to toggle back to the container from here; opening
+			// a NEW connection (or the same one) re-enters it via
+			// ConnectedMsg same as the first time.
+			if m.showingContainer {
+				m.showingContainer = false
+				return m, nil
+			}
 		}
 	case conn_manager.ConnectedMsg:
 		database := msg.(adapters.Database)
-		m.current_view = InitConnectionContainer(database)
-		cmd = m.current_view.Init()
+		m.connectionContainer = InitConnectionContainer(database)
+		m.showingContainer = true
+		return m, m.connectionContainer.Init()
 	}
 
-	return m, cmd
+	// Keep whichever screen is actually visible fully updated. The hidden
+	// one only needs tea.WindowSizeMsg to stay correctly sized for later -
+	// forwarding every message (especially keystrokes) to it while hidden
+	// would leak them: e.g. pressing 's' while writing a SQL query would
+	// also silently trigger "save connection" in the hidden Connection
+	// Manager, or 'j'/'k' would move its list cursor out from under you.
+	var cmCmd, ccCmd tea.Cmd
+	if m.showingContainer {
+		if _, ok := msg.(tea.WindowSizeMsg); ok {
+			m.connectionManager, cmCmd = m.connectionManager.Update(msg)
+		}
+		if m.connectionContainer != nil {
+			m.connectionContainer, ccCmd = m.connectionContainer.Update(msg)
+		}
+	} else {
+		m.connectionManager, cmCmd = m.connectionManager.Update(msg)
+	}
+
+	return m, tea.Batch(cmCmd, ccCmd)
 }
 
 func (m AppModel) View() string {
-	// Once connected, ConnectionContainerModel already renders its own full
-	// 3-pane (explorer/editor/viewer) layout - nothing to compose here.
-	if cm, ok := m.current_view.(conn_manager.ConnectionManager); ok && !cm.IsShowingHelp() {
-		return m.renderPreConnectLayout(cm)
+	if m.showingContainer && m.connectionContainer != nil {
+		// Already connected - ConnectionContainerModel renders its own
+		// full 3-pane (explorer/editor/viewer) layout.
+		return m.connectionContainer.View()
 	}
-	return m.current_view.View()
+
+	cm, ok := m.connectionManager.(conn_manager.ConnectionManager)
+	if !ok || cm.IsShowingHelp() {
+		return m.connectionManager.View()
+	}
+	return m.renderPreConnectLayout(cm)
 }
 
 // renderPreConnectLayout hangs the Connection Manager panel on the left,

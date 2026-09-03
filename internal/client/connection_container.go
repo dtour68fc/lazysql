@@ -188,7 +188,7 @@ func (m ConnectionContainerModel) buildFooter() string {
 		Padding(0, 1)
 	badge := badgeStyle.Render(badgeLabel)
 
-	universal := "1/2/3: jump pane, tab/shift+tab: cycle, shift+j/k: editor<->viewer"
+	universal := "1/2/3: jump pane, tab/shift+tab: cycle, shift+j/k: editor<->viewer, ctrl+p: switch projects"
 	var specific string
 
 	switch m.active_view {
