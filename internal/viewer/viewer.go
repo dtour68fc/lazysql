@@ -58,5 +58,5 @@ func (m ViewerModel) View() string {
 	} else {
 		content = m.content
 	}
-	return utils.RenderPanel("2 Viewer", content, m.layout.ViewerWidth, m.layout.ViewerHeight, m.isActive)
+	return utils.RenderPanel("3 Viewer", content, m.layout.ViewerWidth, m.layout.ViewerHeight, m.isActive)
 }

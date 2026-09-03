@@ -372,7 +372,7 @@ func (m ConnectionManager) RenderPanel() string {
 	// Same panel style as the connected screen (editor/viewer) - title
 	// embedded directly in the rounded border, matching LazyCurl, instead
 	// of a separate "Connection Manager" text line + rule inside a plain box.
-	return utils.RenderPanel("Connection Manager", body, m.layout.WinWidth, m.layout.WinHeight, true)
+	return utils.RenderPanel("1 Connection", body, m.layout.WinWidth, m.layout.WinHeight, true)
 }
 
 // PanelWidth and PanelHeight expose the Connection Manager panel's own

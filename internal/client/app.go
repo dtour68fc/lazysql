@@ -48,6 +48,22 @@ func (m AppModel) rightWidth() int {
 	return w
 }
 
+// bodyHeight is how much vertical space the Connection Manager/Editor/
+// Viewer panels get to share, reserving exactly one row at the bottom for
+// AppModel's own global footer. Sub-components used to get the FULL raw
+// terminal height with nothing held back for that footer, which meant the
+// footer's row pushed the whole composed view one row taller than the
+// actual terminal - since terminals don't clip oversized content from the
+// bottom, that extra row scrolled the true TOP row (the panels' own top
+// borders) off-screen instead.
+func (m AppModel) bodyHeight() int {
+	h := m.height - 1
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -78,6 +94,22 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.cyclePane(1)
 			case "shift+tab":
 				return m.cyclePane(-1)
+			case ":":
+				// Pressing : while looking at Projects/Databases or the
+				// Viewer jumps straight to the editor AND forwards the
+				// ":" itself, so vimtea drops right into command mode -
+				// you don't have to manually jump to pane 2 first just to
+				// start typing a shorthand query. Only kicks in once
+				// there's actually an editor to send it to, and does
+				// nothing extra if you're already on it (vimtea handles
+				// ":" itself there, same as always).
+				if m.activePane != "editor" && m.connectionContainer != nil {
+					m.activePane = "editor"
+					viewCmd := m.applyActiveViewChangedCmd("editor")
+					updatedCC, keyCmd := m.connectionContainer.UpdateEditor(msg)
+					*m.connectionContainer = updatedCC
+					return m, tea.Batch(viewCmd, keyCmd)
+				}
 			}
 		}
 	case conn_manager.ConnectedMsg:
@@ -91,7 +123,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextPane := m.activePane
 		var sizeCmd tea.Cmd
 		if m.width > 0 {
-			updated, cmd := m.connectionContainer.Update(tea.WindowSizeMsg{Width: m.rightWidth(), Height: m.height})
+			updated, cmd := m.connectionContainer.Update(tea.WindowSizeMsg{Width: m.rightWidth(), Height: m.bodyHeight()})
 			*m.connectionContainer = updated
 			sizeCmd = cmd
 		}
@@ -159,13 +191,23 @@ func (m AppModel) routeToActivePane(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !isKey {
 		var cmCmd, ccCmd tea.Cmd
 		var updatedCM tea.Model
-		updatedCM, cmCmd = m.connectionManager.Update(msg)
+		cmMsg := msg
+		if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
+			// Reserve one row for AppModel's own global footer - both the
+			// Connection Manager panel and the connected Editor/Viewer
+			// used to get the full raw terminal height with nothing held
+			// back for it, which pushed the whole composed view one row
+			// taller than the actual terminal and scrolled the true top
+			// row (the panels' own top borders) off-screen.
+			cmMsg = tea.WindowSizeMsg{Width: wsMsg.Width, Height: m.bodyHeight()}
+		}
+		updatedCM, cmCmd = m.connectionManager.Update(cmMsg)
 		m.connectionManager = updatedCM.(conn_manager.ConnectionManager)
 		if m.connectionContainer != nil {
 			// Split the shared width/height message into the narrower
 			// right-hand size the connected screen actually gets.
-			if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
-				wsMsg = tea.WindowSizeMsg{Width: m.rightWidth(), Height: wsMsg.Height}
+			if _, ok := msg.(tea.WindowSizeMsg); ok {
+				wsMsg := tea.WindowSizeMsg{Width: m.rightWidth(), Height: m.bodyHeight()}
 				updated, cmd := m.connectionContainer.Update(wsMsg)
 				*m.connectionContainer = updated
 				ccCmd = cmd
@@ -263,7 +305,7 @@ func (m AppModel) buildFooter() string {
 		Padding(0, 1)
 	badge := badgeStyle.Render(badgeLabel)
 
-	universal := "1/2/3: jump pane, tab/shift+tab: cycle panes"
+	universal := "1/2/3: jump pane, tab/shift+tab: cycle panes, ': ' jumps to editor + command mode"
 	var specific string
 	switch m.activePane {
 	case "manager":
