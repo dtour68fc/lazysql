@@ -192,6 +192,18 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ConnectionErrorMsg:
 		m.connectionError = string(msg)
 		m.connecting = false
+	case ConnectedMsg:
+		// A connect attempt just succeeded. This message is really
+		// consumed by AppModel (which creates/shows the connected
+		// Editor/Viewer), but it's still broadcast to this Update() too -
+		// without this case, m.connecting stays stuck true forever,
+		// showing "Connecting..." permanently in this panel's footer. That
+		// silently didn't matter back when the whole Connection Manager
+		// screen got hidden the moment you connected, but now that it's
+		// permanently visible alongside Editor/Viewer, a stuck flag like
+		// this is immediately visible instead of quietly irrelevant.
+		m.connecting = false
+		m.connectionError = ""
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
 	case SavedConnectionsLoaded:
