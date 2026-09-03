@@ -2,8 +2,10 @@ package conn_manager
 
 import (
 	"fmt"
+	"os"
 	"sort"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 
@@ -58,6 +60,24 @@ type TablesStateMsg struct {
 	Err          string
 }
 
+// DumpRequestMsg is sent when the user confirms the destination folder in
+// the Ctrl+D "dump to .sql" modal - signals ConnectionManager to actually
+// perform the dump, since it owns the live adapters.Database connection
+// this list doesn't have direct access to.
+type DumpRequestMsg struct {
+	Kind         string // "table" | "database"
+	DatabaseName string // which database the table lives in (table dumps) or the database itself (database dumps)
+	TableName    string // only set for Kind == "table"
+	Folder       string
+}
+
+// DumpResultMsg reports the outcome of a DumpRequestMsg - shown as a
+// status line in the Databases tab.
+type DumpResultMsg struct {
+	Path string
+	Err  string
+}
+
 // DatabasesStateMsg pushes the Databases tab's data into ConnectionList -
 // owned and fetched by ConnectionManager (which has the live
 // adapters.Database), but rendered here alongside the Projects list.
@@ -100,6 +120,17 @@ type ConnectionList struct {
 	tables             []string
 	tablesError        string
 	selectedTableIndex int
+
+	// Ctrl+D "dump to .sql" modal - a small folder-path prompt, opened
+	// while hovering a table (dumps just that table's data) or a database
+	// row (dumps every table in it, one file). Data-only dumps (INSERT
+	// statements) - no schema/DDL introspection, see dump.go.
+	dumping      bool
+	dumpKind     string // "table" | "database"
+	dumpTable    string
+	dumpDatabase string
+	dumpInput    textinput.Model
+	dumpStatus   string
 }
 
 func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
@@ -167,6 +198,13 @@ func (m ConnectionList) databasesLocked() bool {
 // which must not fire here since esc already means "back out to the
 // database list" in this state.
 func (m ConnectionList) InTablesDrilldown() bool { return m.inTables }
+
+// IsDumping reports whether the Ctrl+D "dump to .sql" folder-path modal is
+// currently open - global shortcuts (esc/q to quit, 1/2/3 to jump panes)
+// must not be intercepted while true, or canceling the modal with esc
+// would quit the whole app instead, and typing a literal digit or "q" into
+// the folder path would get hijacked instead of typed.
+func (m ConnectionList) IsDumping() bool { return m.dumping }
 
 func (m ConnectionList) moveSelection(delta int) int {
 	rows := m.projectRows()
@@ -347,9 +385,49 @@ func (m ConnectionList) Init() tea.Cmd {
 func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var viewPortCmd tea.Cmd
+
+	if m.dumping {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			switch keyMsg.String() {
+			case "esc":
+				m.dumping = false
+				return m, nil
+			case "enter":
+				m.dumping = false
+				folder := m.dumpInput.Value()
+				req := DumpRequestMsg{Kind: m.dumpKind, DatabaseName: m.dumpDatabase, TableName: m.dumpTable, Folder: folder}
+				return m, func() tea.Msg { return req }
+			}
+			var inputCmd tea.Cmd
+			m.dumpInput, inputCmd = m.dumpInput.Update(keyMsg)
+			return m, inputCmd
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "ctrl+d":
+			// Ctrl+D dumps the hovered table (inside the tables
+			// drill-down) or the hovered database (in the flat database
+			// list) to a .sql file - opens a small prompt for which
+			// folder to write it to.
+			if m.activeTab == "databases" && m.inTables && !m.tablesLoading && len(m.tables) > 0 {
+				m.dumpKind = "table"
+				m.dumpTable = m.tables[m.selectedTableIndex]
+				m.dumpDatabase = m.tablesDatabaseName
+				m.dumping = true
+				m.dumpInput = newDumpFolderInput()
+				return m, nil
+			} else if m.activeTab == "databases" && !m.inTables && !m.databasesLocked() && len(m.databases) > 0 {
+				m.dumpKind = "database"
+				m.dumpDatabase = m.databases[m.selectedDatabaseIndex]
+				m.dumpTable = ""
+				m.dumping = true
+				m.dumpInput = newDumpFolderInput()
+				return m, nil
+			}
 		case "up", "k":
 			if m.activeTab == "databases" && m.inTables && !m.tablesLoading && len(m.tables) > 0 {
 				if m.selectedTableIndex > 0 {
@@ -497,12 +575,54 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tablesError = msg.Err
 		m.selectedTableIndex = 0
 		m.viewport.SetContent(m.contentUI())
+	case DumpResultMsg:
+		if msg.Err != "" {
+			m.dumpStatus = fmt.Sprintf("Dump failed: %s", msg.Err)
+		} else {
+			m.dumpStatus = fmt.Sprintf("Dumped to %s", msg.Path)
+		}
+		m.viewport.SetContent(m.contentUI())
 	}
 	m.viewport, viewPortCmd = m.viewport.Update(msg)
 	return m, tea.Batch(cmd, viewPortCmd)
 }
 
 func (m ConnectionList) View() string {
+	if m.dumping {
+		return fmt.Sprintf("%s\n%s", m.tabsUI(), m.renderDumpModal())
+	}
 	info := fmt.Sprintf("Current rows: %d\nTotal rows: %d", m.viewport.VisibleLineCount(), m.viewport.TotalLineCount())
-	return fmt.Sprintf("%s\n%s\n%s", m.tabsUI(), m.viewport.View(), info)
+	status := ""
+	if m.dumpStatus != "" {
+		status = "\n" + m.dumpStatus
+	}
+	return fmt.Sprintf("%s\n%s\n%s%s", m.tabsUI(), m.viewport.View(), info, status)
+}
+
+// newDumpFolderInput builds the Ctrl+D destination-folder prompt, prefilled
+// with the current working directory as a reasonable default.
+func newDumpFolderInput() textinput.Model {
+	input := textinput.New()
+	dir, err := os.Getwd()
+	if err == nil {
+		input.SetValue(dir)
+	}
+	input.CursorEnd()
+	input.Focus()
+	return input
+}
+
+func (m ConnectionList) renderDumpModal() string {
+	title := fmt.Sprintf("Dump %s '%s' to .sql - choose a folder", m.dumpKind, m.dumpTargetLabel())
+	box := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2).Width(70)
+	hint := lipgloss.NewStyle().Faint(true).Render("Save (enter)   Cancel (esc)")
+	body := lipgloss.JoinVertical(lipgloss.Left, title, "", m.dumpInput.View(), "", hint)
+	return box.Render(body)
+}
+
+func (m ConnectionList) dumpTargetLabel() string {
+	if m.dumpKind == "table" {
+		return m.dumpTable
+	}
+	return m.dumpDatabase
 }

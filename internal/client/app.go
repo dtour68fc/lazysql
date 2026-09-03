@@ -77,6 +77,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		canJumpPanes := !m.connectionManager.IsEditingConnection() &&
 			!m.connectionManager.IsShowingHelp() &&
+			!m.connectionManager.IsDumping() &&
 			!(m.activePane == "editor" && m.connectionContainer != nil && m.connectionContainer.IsEditorCapturingInput()) &&
 			!(m.activePane == "viewer" && m.connectionContainer != nil && m.connectionContainer.IsViewerEditingCell())
 

@@ -35,6 +35,16 @@ type ConnectionManager struct {
 	// screen for a specific database.
 	activeDatabase       adapters.Database
 	activeConnectionName string
+
+	// Session restore (see session.go) - saved every time you connect to
+	// a project/database/table, restored automatically on the next
+	// launch. sessionRestoreAttempted makes sure this only fires once,
+	// since SavedConnectionsLoaded and SessionLoadedMsg race (both are
+	// independent async Init() cmds, arriving in either order) - whichever
+	// arrives second is what actually kicks off the restore-connect.
+	pendingRestoreSession   SessionState
+	connectionsLoaded       bool
+	sessionRestoreAttempted bool
 }
 
 type SelectedConnectionMsg adapters.DbConnection
@@ -212,6 +222,26 @@ func (m ConnectionManager) deleteConnection(name string) tea.Cmd {
 	}
 }
 
+// performDump runs the actual table/database dump (see dump.go) - kept
+// here rather than in conn_list.go since it needs the live
+// adapters.Database connection, which only ConnectionManager holds.
+func (m ConnectionManager) performDump(req DumpRequestMsg) tea.Cmd {
+	db := m.activeDatabase
+	return func() tea.Msg {
+		var path string
+		var err error
+		if req.Kind == "table" {
+			path, err = dumpTable(db, req.TableName, req.Folder)
+		} else {
+			path, err = dumpDatabase(db, req.DatabaseName, req.Folder)
+		}
+		if err != nil {
+			return DumpResultMsg{Err: err.Error()}
+		}
+		return DumpResultMsg{Path: path}
+	}
+}
+
 // hasRealConnectionsCmd tells the list whether there are any real saved
 // connections, right after they're (re)loaded.
 func hasRealConnectionsCmd(has bool) tea.Cmd {
@@ -241,7 +271,36 @@ func InitConnectionManager() ConnectionManager {
 }
 
 func (m ConnectionManager) Init() tea.Cmd {
-	return tea.Batch(m.list.Init(), m.form.Init(), loadSavedConnections())
+	return tea.Batch(m.list.Init(), m.form.Init(), loadSavedConnections(), loadSessionCmd())
+}
+
+// SessionLoadedMsg carries whatever was saved from the last time you
+// quit (see session.go) - empty (zero value) if there was no session file
+// yet (brand new install).
+type SessionLoadedMsg SessionState
+
+func loadSessionCmd() tea.Cmd {
+	return func() tea.Msg {
+		s, _ := loadSession()
+		return SessionLoadedMsg(s)
+	}
+}
+
+// tryRestoreSession kicks off reconnecting to the last-used project (and,
+// once its databases load, opening the last-used table) - guarded so it
+// only ever fires once, and only once BOTH the saved connections and the
+// saved session have actually loaded (they're independent async Init()
+// cmds racing in either order).
+func (m *ConnectionManager) tryRestoreSession() tea.Cmd {
+	if m.sessionRestoreAttempted || !m.connectionsLoaded || m.pendingRestoreSession.ProjectName == "" {
+		return nil
+	}
+	m.sessionRestoreAttempted = true
+	conn, exists := m.connectionsByName[m.pendingRestoreSession.ProjectName]
+	if !exists {
+		return nil
+	}
+	return func() tea.Msg { return LoadDatabasesMsg(conn) }
 }
 
 func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -289,7 +348,11 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.layout = utils.ConnectionManagerLayout(msg)
 	case SavedConnectionsLoaded:
 		m.connectionsByName = map[string]adapters.DbConnection(msg)
-		command = tea.Batch(m.loadConnections(), hasRealConnectionsCmd(len(m.connectionsByName) > 0))
+		m.connectionsLoaded = true
+		command = tea.Batch(m.loadConnections(), hasRealConnectionsCmd(len(m.connectionsByName) > 0), m.tryRestoreSession())
+	case SessionLoadedMsg:
+		m.pendingRestoreSession = SessionState(msg)
+		command = m.tryRestoreSession()
 	case SelectedConnectionMsg:
 		conn := adapters.DbConnection(msg)
 		m.selectedConnectionName = conn.Name
@@ -320,7 +383,23 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		connectedCmd := func() tea.Msg {
 			return ConnectedMsg{Database: msg.Database, ProjectName: msg.ProjectName}
 		}
-		command = tea.Batch(databasesCmd, connectedCmd)
+		// If this load was kicked off to restore last session (see
+		// SessionLoadedMsg/tryRestoreSession above), immediately continue
+		// on to opening the saved table too, instead of leaving you on
+		// the Databases tab having to pick it again yourself. Otherwise,
+		// remember this as the new restore point in case you quit before
+		// opening a specific table (session.go).
+		var continueCmd tea.Cmd
+		if m.pendingRestoreSession.ProjectName == msg.ProjectName && m.pendingRestoreSession.TableName != "" {
+			restore := m.pendingRestoreSession
+			m.pendingRestoreSession = SessionState{}
+			continueCmd = func() tea.Msg {
+				return OpenTableMsg{DatabaseName: restore.DatabaseName, TableName: restore.TableName}
+			}
+		} else {
+			saveSession(SessionState{ProjectName: msg.ProjectName})
+		}
+		command = tea.Batch(databasesCmd, connectedCmd, continueCmd)
 	case DatabasesErrorMsgInternal:
 		command = func() tea.Msg {
 			return DatabasesStateMsg{Err: msg.Err, ProjectName: msg.ProjectName}
@@ -339,6 +418,7 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			name := m.activeConnectionName
 			dbName := msg.DatabaseName
 			tableName := msg.TableName
+			saveSession(SessionState{ProjectName: name, DatabaseName: dbName, TableName: tableName})
 			command = func() tea.Msg {
 				return ConnectedMsg{
 					Database:     db,
@@ -348,6 +428,10 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					Table:        tableName,
 				}
 			}
+		}
+	case DumpRequestMsg:
+		if m.activeDatabase != nil {
+			command = m.performDump(msg)
 		}
 	}
 
@@ -416,6 +500,15 @@ func (m ConnectionManager) IsEditingConnection() bool { return m.editingConnecti
 func (m ConnectionManager) IsInTablesDrilldown() bool {
 	if list, ok := m.list.(ConnectionList); ok {
 		return list.InTablesDrilldown()
+	}
+	return false
+}
+
+// IsDumping reports whether the Ctrl+D "dump to .sql" folder-path modal is
+// currently open - see ConnectionList.IsDumping.
+func (m ConnectionManager) IsDumping() bool {
+	if list, ok := m.list.(ConnectionList); ok {
+		return list.IsDumping()
 	}
 	return false
 }
