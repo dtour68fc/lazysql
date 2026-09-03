@@ -28,10 +28,11 @@ type OpenActiveConnectionMsg struct{}
 // and fetched by ConnectionManager (which has the live adapters.Database),
 // but rendered here alongside the Projects list.
 type TablesStateMsg struct {
-	Loading     bool
-	ProjectName string
-	Tables      []string
-	Err         string
+	Loading      bool
+	ProjectName  string
+	DatabaseName string
+	Tables       []string
+	Err          string
 }
 
 // HasRealConnectionsMsg tells the list whether there are any real saved
@@ -48,10 +49,11 @@ type ConnectionList struct {
 	hasRealConnections      bool
 
 	// Tables tab state (populated by ConnectionManager via TablesStateMsg)
-	tablesLoading     bool
-	tablesProjectName string
-	tables            []string
-	tablesError       string
+	tablesLoading      bool
+	tablesProjectName  string
+	tablesDatabaseName string
+	tables             []string
+	tablesError        string
 	selectedTableIndex int
 }
 
@@ -198,10 +200,14 @@ func (m ConnectionList) tablesUI() string {
 	}
 
 	if len(m.tables) == 0 {
-		return lipgloss.NewStyle().Faint(true).Padding(1, 2).Render(fmt.Sprintf("%s has no tables.", m.tablesProjectName))
+		return lipgloss.NewStyle().Faint(true).Padding(1, 2).Render(
+			fmt.Sprintf("%s has no tables in database '%s'.", m.tablesProjectName, m.tablesDatabaseName),
+		)
 	}
 
-	header := lipgloss.NewStyle().Bold(true).Padding(0, 2).Render(fmt.Sprintf("Tables in %s", m.tablesProjectName))
+	header := lipgloss.NewStyle().Bold(true).Padding(0, 2).Render(
+		fmt.Sprintf("Tables in %s (database: %s)", m.tablesProjectName, m.tablesDatabaseName),
+	)
 	normalStyle := lipgloss.NewStyle().Padding(0, 2)
 	selectedStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("57")).
@@ -332,6 +338,7 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TablesStateMsg:
 		m.tablesLoading = msg.Loading
 		m.tablesProjectName = msg.ProjectName
+		m.tablesDatabaseName = msg.DatabaseName
 		m.tables = msg.Tables
 		m.tablesError = msg.Err
 		m.selectedTableIndex = 0

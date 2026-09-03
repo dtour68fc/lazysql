@@ -107,16 +107,33 @@ func fetchTablesForLiveConnection(name string, database adapters.Database, datab
 	}
 }
 
+// knownEmptySystemDatabases are admin/system databases that are basically
+// never where a user's actual tables live - skipped when guessing which
+// database to show, since GetDatabases() often returns one of these FIRST
+// (e.g. "postgres" itself), which is exactly the wrong one to land on.
+var knownEmptySystemDatabases = map[string]bool{
+	"postgres":           true,
+	"template0":          true,
+	"template1":          true,
+	"mysql":              true,
+	"information_schema": true,
+	"performance_schema": true,
+	"sys":                true,
+}
+
 // fetchTablesMsg does the actual GetTables work shared by both connect
-// paths. If databaseName is given explicitly, uses it directly; otherwise
-// falls back to whichever database GetDatabases() happens to return first.
+// paths. If databaseName is given explicitly, uses it directly - no
+// guessing. Otherwise, tries every database GetDatabases() returns (skipping
+// well-known empty system databases first) and picks the first one that
+// actually has tables, instead of blindly using whichever comes back first
+// (which is very often just the empty admin database).
 func fetchTablesMsg(name string, database adapters.Database, databaseName string) tea.Msg {
 	if databaseName != "" {
 		tables, err := database.GetTables(databaseName)
 		if err != nil {
 			return TablesErrorMsgInternal{ProjectName: name, Err: err.Error()}
 		}
-		return TablesLoadedMsgInternal{ProjectName: name, Database: database, Tables: tables}
+		return TablesLoadedMsgInternal{ProjectName: name, DatabaseName: databaseName, Database: database, Tables: tables}
 	}
 
 	databases, err := database.GetDatabases()
@@ -126,11 +143,27 @@ func fetchTablesMsg(name string, database adapters.Database, databaseName string
 	if len(databases) == 0 {
 		return TablesLoadedMsgInternal{ProjectName: name, Database: database, Tables: nil}
 	}
+
+	// First pass: skip known-empty system databases, use the first
+	// non-system one that actually has tables.
+	for _, db := range databases {
+		if knownEmptySystemDatabases[db] {
+			continue
+		}
+		tables, err := database.GetTables(db)
+		if err == nil && len(tables) > 0 {
+			return TablesLoadedMsgInternal{ProjectName: name, DatabaseName: db, Database: database, Tables: tables}
+		}
+	}
+
+	// Nothing non-system had tables either (or everything was a system
+	// database) - fall back to the plain first-one-returned behavior so
+	// there's still SOMETHING to show instead of nothing at all.
 	tables, err := database.GetTables(databases[0])
 	if err != nil {
 		return TablesErrorMsgInternal{ProjectName: name, Err: err.Error()}
 	}
-	return TablesLoadedMsgInternal{ProjectName: name, Database: database, Tables: tables}
+	return TablesLoadedMsgInternal{ProjectName: name, DatabaseName: databases[0], Database: database, Tables: tables}
 }
 
 // TablesLoadedMsgInternal / TablesErrorMsgInternal carry the live
@@ -138,9 +171,10 @@ func fetchTablesMsg(name string, database adapters.Database, databaseName string
 // cycle concern - it's kept in ConnectionManager instead) alongside the
 // fetch result.
 type TablesLoadedMsgInternal struct {
-	ProjectName string
-	Database    adapters.Database
-	Tables      []string
+	ProjectName  string
+	DatabaseName string
+	Database     adapters.Database
+	Tables       []string
 }
 type TablesErrorMsgInternal struct {
 	ProjectName string
@@ -274,8 +308,15 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TablesLoadedMsgInternal:
 		m.activeDatabase = msg.Database
 		m.activeConnectionName = msg.ProjectName
+		if msg.DatabaseName != "" {
+			// Keep the RESOLVED database name (whether explicitly
+			// specified or smart-guessed here) so opening the full
+			// screen later (OpenActiveConnectionMsg) targets the same
+			// one, not whatever the pre-guess default was.
+			m.activeDatabaseName = msg.DatabaseName
+		}
 		command = func() tea.Msg {
-			return TablesStateMsg{ProjectName: msg.ProjectName, Tables: msg.Tables}
+			return TablesStateMsg{ProjectName: msg.ProjectName, DatabaseName: msg.DatabaseName, Tables: msg.Tables}
 		}
 	case TablesErrorMsgInternal:
 		command = func() tea.Msg {
