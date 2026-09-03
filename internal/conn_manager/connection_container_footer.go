@@ -16,12 +16,12 @@ func editFooter() string {
 
 func normalFooter() string {
 	return fmt.Sprintf("%s, %s, %s, %s, %s, %s, %s, %s",
-		"Load tables (enter/space)",
+		"Load databases (enter/space)",
 		"New project (shift+n)",
 		"Edit (e)",
 		"Save (s)",
 		"Navigate (j,k)",
-		"Switch Projects/Tables (shift+h/l)",
+		"Switch Projects/Databases (shift+h/l)",
 		"Change Mode (m)",
 		"Help (?)",
 	)
@@ -42,9 +42,10 @@ func renderHelp(width int, height int) string {
 - Driver is used to establish and find the database server
  * Cycle between the supported drivers with h/l or left/right arrows
  * PostgreSQL (pgx) and MySQL (mysql) are currently supported
-- Database (optional) picks which specific database the Tables tab and
-  editor queries target - leave blank and it'll guess (the first one
-  GetDatabases() returns, often just the empty admin db)
+- Database (optional) only matters if you connect via Enter while
+  editing (skipping the Projects->Databases flow entirely) - it sets
+  which database your queries target from the start. Going through
+  Projects->Databases always shows the full list and lets you pick.
 - Quit this dialog by hitting "?" or "esc"
 	`
 	return lipgloss.NewStyle().

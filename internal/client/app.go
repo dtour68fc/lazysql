@@ -10,7 +10,7 @@ import (
 	lipgloss "github.com/charmbracelet/lipgloss"
 )
 
-// AppModel keeps the Connection Manager (Projects/Tables) permanently
+// AppModel keeps the Connection Manager (Projects/Databases) permanently
 // visible as pane 1, with Editor (pane 2) and Viewer (pane 3) on the right -
 // always all three, never a full-screen toggle between "browsing projects"
 // and "writing a query". Connecting to a project just makes Editor/Viewer
@@ -119,9 +119,9 @@ func (m AppModel) applyActiveViewChangedCmd(view string) tea.Cmd {
 }
 
 // cyclePane moves focus forward (delta=1) or backward (delta=-1) through
-// all three panes: Projects/Tables (manager) -> Editor -> Viewer -> back to
+// all three panes: Projects/Databases (manager) -> Editor -> Viewer -> back to
 // manager. Global, always active regardless of which pane currently has
-// focus - the Connection Manager's OWN Projects/Tables sub-tab switch uses
+// focus - the Connection Manager's OWN Projects/Databases sub-tab switch uses
 // shift+h/shift+l instead (see conn_list.go), matching LazyCurl's
 // Collections/Envs convention, so plain tab is free for this.
 func (m AppModel) cyclePane(delta int) (tea.Model, tea.Cmd) {
@@ -253,7 +253,7 @@ func (m AppModel) buildFooter() string {
 	var specific string
 	switch m.activePane {
 	case "manager":
-		specific = "enter/space: load tables, shift+n: new project, e: edit, s: save, j/k: navigate, shift+h/l: projects/tables"
+		specific = "enter/space: load databases, shift+n: new project, e: edit, s: save, j/k: navigate, shift+h/l: projects/databases"
 	case "editor":
 		specific = "ctrl+r or ctrl+s: run query"
 	case "viewer":
