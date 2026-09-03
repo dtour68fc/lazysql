@@ -152,6 +152,14 @@ func (m ConnectionManager) View() string {
 		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, helpView)
 	}
 
+	return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, m.RenderPanel())
+}
+
+// RenderPanel renders just the bordered "Connection Manager" box itself,
+// without centering it on the full screen - used by AppModel to hang it on
+// the left side alongside empty Editor/Viewer placeholder panels, the same
+// way the connected screen hangs Explorer on the left of Editor/Viewer.
+func (m ConnectionManager) RenderPanel() string {
 	footer := m.buildFooter()
 	listView := m.list.View()
 	formView := m.form.View()
@@ -162,10 +170,19 @@ func (m ConnectionManager) View() string {
 	// title embedded directly in the rounded border, matching LazyCurl,
 	// instead of a separate "Connection Manager" text line + rule inside a
 	// plain box.
-	container := utils.RenderPanel("Connection Manager", body, m.layout.WinWidth, m.layout.WinHeight, true)
-
-	return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, container)
+	return utils.RenderPanel("Connection Manager", body, m.layout.WinWidth, m.layout.WinHeight, true)
 }
+
+// PanelWidth and PanelHeight expose the Connection Manager panel's own
+// rendered dimensions, so AppModel can size the placeholder Editor/Viewer
+// panels to line up with it.
+func (m ConnectionManager) PanelWidth() int  { return m.layout.WinWidth }
+func (m ConnectionManager) PanelHeight() int { return m.layout.WinHeight }
+
+// IsShowingHelp reports whether the full-screen help overlay is active, in
+// which case AppModel should just delegate to the normal View() instead of
+// composing the hung-left layout (the help screen wants the whole terminal).
+func (m ConnectionManager) IsShowingHelp() bool { return m.showHelp }
 
 func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager, tea.Cmd) {
 	var command tea.Cmd
