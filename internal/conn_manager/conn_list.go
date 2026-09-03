@@ -20,13 +20,35 @@ import (
 // has your tables - you see all of them and pick.
 type LoadDatabasesMsg adapters.DbConnection
 
-// OpenDatabaseMsg is sent when the user presses enter on a specific
+// LoadTablesMsg is sent when the user presses space/enter on a specific
 // database row in the (unlocked) Databases tab - signals ConnectionManager
-// to open the full editor/viewer screen targeting exactly that database,
-// using the connection that was already established to list them (no
-// reconnecting).
-type OpenDatabaseMsg struct {
+// to fetch the FULL list of tables in that database (using the connection
+// already established to list the databases, no reconnecting), same as
+// expanding a database in the old Explorer pane.
+type LoadTablesMsg struct {
 	DatabaseName string
+}
+
+// OpenTableMsg is sent when the user presses enter on a specific table row
+// (once its database's table list is loaded) - signals ConnectionManager to
+// open the full editor/viewer screen targeting that database, with a
+// "SELECT * FROM <table>" already seeded and run, same as opening a file in
+// a netrw/oil.nvim style explorer instead of leaving you to write it
+// yourself.
+type OpenTableMsg struct {
+	DatabaseName string
+	TableName    string
+}
+
+// TablesStateMsg pushes the currently-selected database's table list into
+// ConnectionList - owned and fetched by ConnectionManager (which has the
+// live adapters.Database), but rendered here as a nested drill-down inside
+// the Databases tab.
+type TablesStateMsg struct {
+	Loading      bool
+	DatabaseName string
+	Tables       []string
+	Err          string
 }
 
 // DatabasesStateMsg pushes the Databases tab's data into ConnectionList -
@@ -60,6 +82,17 @@ type ConnectionList struct {
 	databases             []string
 	databasesError        string
 	selectedDatabaseIndex int
+
+	// Tables drill-down, nested one level inside the Databases tab (like
+	// expanding a directory in a file explorer) - entered by pressing
+	// enter/space on a database row, left by pressing esc/h to pop back
+	// up to the database list.
+	inTables           bool
+	tablesLoading      bool
+	tablesDatabaseName string
+	tables             []string
+	tablesError        string
+	selectedTableIndex int
 }
 
 func InitConnectionList(layout utils.ConnectionManagerLayout) ConnectionList {
@@ -179,6 +212,10 @@ func (m ConnectionList) projectsUI() string {
 }
 
 func (m ConnectionList) databasesUI() string {
+	if m.inTables {
+		return m.tablesUI()
+	}
+
 	if m.databasesLocked() {
 		lockedStyle := lipgloss.NewStyle().Faint(true).Padding(1, 2)
 		if !m.hasRealConnections {
@@ -214,6 +251,44 @@ func (m ConnectionList) databasesUI() string {
 			lines = append(lines, selectedStyle.Render(database))
 		} else {
 			lines = append(lines, normalStyle.Render(database))
+		}
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+// tablesUI renders the drill-down list of tables inside whichever database
+// was picked - enter/space on a database row lists its tables here, same
+// nesting feel as expanding a directory in a file explorer. esc/h pops back
+// out to the database list.
+func (m ConnectionList) tablesUI() string {
+	if m.tablesLoading {
+		return lipgloss.NewStyle().Padding(1, 2).Render(fmt.Sprintf("Loading tables for %s...", m.tablesDatabaseName))
+	}
+
+	if m.tablesError != "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("161")).Padding(1, 2).Render(
+			fmt.Sprintf("Failed to load tables for %s:\n%s\n\nesc/h: back", m.tablesDatabaseName, m.tablesError),
+		)
+	}
+
+	header := lipgloss.NewStyle().Bold(true).Padding(0, 2).Render(fmt.Sprintf("Tables in %s (esc/h: back)", m.tablesDatabaseName))
+	if len(m.tables) == 0 {
+		empty := lipgloss.NewStyle().Faint(true).Padding(1, 2).Render(fmt.Sprintf("%s has no tables.", m.tablesDatabaseName))
+		return lipgloss.JoinVertical(lipgloss.Left, header, empty)
+	}
+
+	normalStyle := lipgloss.NewStyle().Padding(0, 2)
+	selectedStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("57")).
+		Foreground(lipgloss.Color("229")).
+		Padding(0, 2)
+
+	lines := []string{header}
+	for i, table := range m.tables {
+		if i == m.selectedTableIndex {
+			lines = append(lines, selectedStyle.Render(table))
+		} else {
+			lines = append(lines, normalStyle.Render(table))
 		}
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
@@ -262,7 +337,11 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
-			if m.activeTab == "databases" && !m.databasesLocked() && len(m.databases) > 0 {
+			if m.activeTab == "databases" && m.inTables && !m.tablesLoading && len(m.tables) > 0 {
+				if m.selectedTableIndex > 0 {
+					m.selectedTableIndex--
+				}
+			} else if m.activeTab == "databases" && !m.databasesLocked() && len(m.databases) > 0 {
 				if m.selectedDatabaseIndex > 0 {
 					m.selectedDatabaseIndex--
 				}
@@ -272,7 +351,11 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.viewport.SetContent(m.contentUI())
 		case "down", "j":
-			if m.activeTab == "databases" && !m.databasesLocked() && len(m.databases) > 0 {
+			if m.activeTab == "databases" && m.inTables && !m.tablesLoading && len(m.tables) > 0 {
+				if m.selectedTableIndex < len(m.tables)-1 {
+					m.selectedTableIndex++
+				}
+			} else if m.activeTab == "databases" && !m.databasesLocked() && len(m.databases) > 0 {
 				if m.selectedDatabaseIndex < len(m.databases)-1 {
 					m.selectedDatabaseIndex++
 				}
@@ -281,6 +364,15 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd = m.changeSelectedConnection(m.selectedConnectionIndex)
 			}
 			m.viewport.SetContent(m.contentUI())
+		case "esc", "h":
+			// Pop back out of the tables drill-down to the database list,
+			// same as backing out of a directory in a file explorer.
+			// Doesn't touch the Projects tab or the Databases/Projects
+			// sub-tab switch itself (that's Shift+H).
+			if m.activeTab == "databases" && m.inTables {
+				m.inTables = false
+				m.viewport.SetContent(m.contentUI())
+			}
 		case "H", "L":
 			// Shift+H/Shift+L switch Projects/Databases sub-tabs, matching
 			// LazyCurl's Shift+H/L Collections/Envs convention. Plain tab
@@ -304,9 +396,20 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmd = func() tea.Msg { return LoadDatabasesMsg(selected) }
 					}
 				}
+			} else if m.activeTab == "databases" && m.inTables && !m.tablesLoading && len(m.tables) > 0 {
+				chosenTable := m.tables[m.selectedTableIndex]
+				chosenDatabase := m.tablesDatabaseName
+				cmd = func() tea.Msg { return OpenTableMsg{DatabaseName: chosenDatabase, TableName: chosenTable} }
 			} else if m.activeTab == "databases" && !m.databasesLocked() && len(m.databases) > 0 {
 				chosen := m.databases[m.selectedDatabaseIndex]
-				cmd = func() tea.Msg { return OpenDatabaseMsg{DatabaseName: chosen} }
+				m.inTables = true
+				m.tablesLoading = true
+				m.tablesDatabaseName = chosen
+				m.tables = nil
+				m.tablesError = ""
+				m.selectedTableIndex = 0
+				m.viewport.SetContent(m.contentUI())
+				cmd = func() tea.Msg { return LoadTablesMsg{DatabaseName: chosen} }
 			}
 		}
 	case SelectedConnectionMsg:
@@ -337,6 +440,15 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.databases = msg.Databases
 		m.databasesError = msg.Err
 		m.selectedDatabaseIndex = 0
+		m.inTables = false
+		m.viewport.SetContent(m.contentUI())
+	case TablesStateMsg:
+		m.inTables = true
+		m.tablesLoading = msg.Loading
+		m.tablesDatabaseName = msg.DatabaseName
+		m.tables = msg.Tables
+		m.tablesError = msg.Err
+		m.selectedTableIndex = 0
 		m.viewport.SetContent(m.contentUI())
 	}
 	m.viewport, viewPortCmd = m.viewport.Update(msg)

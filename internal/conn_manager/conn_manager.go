@@ -51,6 +51,12 @@ type ConnectedMsg struct {
 	Database     adapters.Database
 	ProjectName  string
 	DatabaseName string
+	// AutoRunQuery, when non-empty, gets seeded into the editor's buffer
+	// and run immediately once the connected screen opens - used by
+	// picking a table in the Databases tab's drill-down (see
+	// OpenTableMsg) to jump straight to its "SELECT *" results, same as
+	// opening a file in a netrw/oil.nvim style explorer.
+	AutoRunQuery string
 }
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
@@ -128,6 +134,21 @@ type DatabasesLoadedMsgInternal struct {
 type DatabasesErrorMsgInternal struct {
 	ProjectName string
 	Err         string
+}
+
+// fetchTablesForDatabase lists the tables of a specific database on the
+// already-live connection (switching the connection's active database as a
+// side effect, same as GetTables always did) - no reconnecting needed, this
+// reuses m.activeDatabase the same way fetchDatabasesForLiveConnection
+// does.
+func fetchTablesForDatabase(databaseName string, database adapters.Database) tea.Cmd {
+	return func() tea.Msg {
+		tables, err := database.GetTables(databaseName)
+		if err != nil {
+			return TablesStateMsg{DatabaseName: databaseName, Err: err.Error()}
+		}
+		return TablesStateMsg{DatabaseName: databaseName, Tables: tables}
+	}
 }
 
 func (m ConnectionManager) toggleConnectionEdit() tea.Cmd {
@@ -262,13 +283,27 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		command = func() tea.Msg {
 			return DatabasesStateMsg{Err: msg.Err, ProjectName: msg.ProjectName}
 		}
-	case OpenDatabaseMsg:
+	case LoadTablesMsg:
+		if m.activeDatabase != nil {
+			dbName := msg.DatabaseName
+			loadingMsgCmd := func() tea.Msg {
+				return TablesStateMsg{Loading: true, DatabaseName: dbName}
+			}
+			command = tea.Batch(loadingMsgCmd, fetchTablesForDatabase(dbName, m.activeDatabase))
+		}
+	case OpenTableMsg:
 		if m.activeDatabase != nil {
 			db := m.activeDatabase
 			name := m.activeConnectionName
 			dbName := msg.DatabaseName
+			tableName := msg.TableName
 			command = func() tea.Msg {
-				return ConnectedMsg{Database: db, ProjectName: name, DatabaseName: dbName}
+				return ConnectedMsg{
+					Database:     db,
+					ProjectName:  name,
+					DatabaseName: dbName,
+					AutoRunQuery: fmt.Sprintf("SELECT * FROM %s;", tableName),
+				}
 			}
 		}
 	}
@@ -348,10 +383,10 @@ func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager
 			// connect attempt fails) means you don't lose what you typed
 			// either way. When NOT editing, Enter is owned by the list
 			// instead (space/enter on a project row loads its full
-			// database list in place; enter on a specific database row
-			// opens the full screen targeting that database, using the
-			// connection already established for that - see
-			// LoadDatabasesMsg / OpenDatabaseMsg in conn_list.go).
+			// database list in place; enter on a database row lists its
+			// tables; enter on a table row opens the full screen with a
+			// "SELECT *" already run - see LoadDatabasesMsg /
+			// LoadTablesMsg / OpenTableMsg in conn_list.go).
 			if m.editingConnection {
 				m.connecting = true
 				m.editingConnection = false

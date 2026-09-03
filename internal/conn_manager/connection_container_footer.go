@@ -16,13 +16,13 @@ func editFooter() string {
 
 func normalFooter() string {
 	return fmt.Sprintf("%s, %s, %s, %s, %s, %s, %s, %s",
-		"Load databases (enter/space)",
+		"Select (enter/space)",
 		"New project (shift+n)",
 		"Edit (e)",
 		"Save (s)",
 		"Navigate (j,k)",
+		"Back (esc/h)",
 		"Switch Projects/Databases (shift+h/l)",
-		"Change Mode (m)",
 		"Help (?)",
 	)
 }
@@ -46,6 +46,9 @@ func renderHelp(width int, height int) string {
   editing (skipping the Projects->Databases flow entirely) - it sets
   which database your queries target from the start. Going through
   Projects->Databases always shows the full list and lets you pick.
+- Picking a database (enter/space) lists its tables; picking a table
+  opens the editor with "SELECT * FROM <table>" already run. esc/h
+  backs out of the table list to the database list.
 - Quit this dialog by hitting "?" or "esc"
 	`
 	return lipgloss.NewStyle().

@@ -81,7 +81,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case conn_manager.ConnectedMsg:
-		cc := InitConnectionContainer(msg.Database)
+		cc := InitConnectionContainer(msg.Database, msg.AutoRunQuery)
 		m.connectionContainer = &cc
 		m.activePane = "editor"
 		var sizeCmd tea.Cmd
@@ -253,7 +253,7 @@ func (m AppModel) buildFooter() string {
 	var specific string
 	switch m.activePane {
 	case "manager":
-		specific = "enter/space: load databases, shift+n: new project, e: edit, s: save, j/k: navigate, shift+h/l: projects/databases"
+		specific = "enter/space: select, esc/h: back, shift+n: new project, e: edit, s: save, j/k: navigate, shift+h/l: projects/databases"
 	case "editor":
 		specific = "ctrl+r or ctrl+s: run query"
 	case "viewer":

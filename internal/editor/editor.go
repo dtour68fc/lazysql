@@ -18,17 +18,28 @@ func (m EditorModel) IsCapturingInput() bool {
 }
 
 type EditorModel struct {
-	database adapters.Database
-	layout   utils.ConnectionContainerLayout
-	isActive bool
-	editor   vimtea.Editor
+	database     adapters.Database
+	layout       utils.ConnectionContainerLayout
+	isActive     bool
+	editor       vimtea.Editor
+	runQuery     func(text string) tea.Cmd
+	initialQuery string
 }
 
-func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayout) EditorModel {
-	editor := vimtea.NewEditor(
+// InitEditor builds the editor. initialQuery, when non-empty, seeds the
+// buffer with that text (e.g. "SELECT * FROM users;" from picking a table
+// in the Databases tab's drill-down) AND runs it immediately on Init() -
+// same affordance as netrw/oil.nvim opening a file the moment you select
+// it, instead of making you retype/re-trigger the query yourself.
+func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayout, initialQuery string) EditorModel {
+	editorOpts := []vimtea.EditorOption{
 		vimtea.WithEnableStatusBar(true),
 		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("255"))),
-	)
+	}
+	if initialQuery != "" {
+		editorOpts = append(editorOpts, vimtea.WithContent(initialQuery))
+	}
+	editor := vimtea.NewEditor(editorOpts...)
 	runQuery := func(text string) tea.Cmd {
 		return func() tea.Msg {
 			rows, err := database.RunQuery(text)
@@ -57,16 +68,21 @@ func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayo
 		Handler:     func(buf vimtea.Buffer) tea.Cmd { return runQuery(buf.Text()) },
 	})
 	return EditorModel{
-		database: database,
-		layout:   layout,
-		isActive: false,
-		editor:   editor,
+		database:     database,
+		layout:       layout,
+		isActive:     false,
+		editor:       editor,
+		runQuery:     runQuery,
+		initialQuery: initialQuery,
 	}
 }
 
 func (m EditorModel) Init() tea.Cmd {
 	newEditor, cmd := m.editor.SetSize(m.layout.EditorWidth-2, m.layout.EditorHeight-2)
 	m.editor = newEditor.(vimtea.Editor)
+	if m.initialQuery != "" {
+		return tea.Batch(m.editor.Init(), cmd, m.runQuery(m.initialQuery))
+	}
 	return tea.Batch(m.editor.Init(), cmd)
 }
 
