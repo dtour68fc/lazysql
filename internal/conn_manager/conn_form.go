@@ -30,9 +30,9 @@ func InitConnForm(layout utils.ConnectionManagerLayout) ConnectionForm {
 			createPasswordInput(""),
 			createUrlInput(""),
 			createCommandInput(""),
-			createProjectInput(""), // index 8 - appended, not inserted, so
-			// none of the hardcoded 0-7 indices used throughout this file
-			// shift around
+			// No separate "Project" field - a connection's Name IS its
+			// project alias now (e.g. "PMO" -> localhost:5432), so a
+			// second optional project-grouping tag was just redundant.
 		},
 		focusIndex:  -1,
 		layout:      layout,
@@ -73,7 +73,6 @@ func (m ConnectionForm) setSelectedConnection(conn adapters.DbConnection) Connec
 	m.inputs[5].SetValue(conn.Password)
 	m.inputs[6].SetValue(conn.Url)
 	m.inputs[7].SetValue(conn.Command)
-	m.inputs[8].SetValue(conn.Project)
 
 	if conn.Command != "" {
 		m.mode = "command"
@@ -208,9 +207,6 @@ func (m ConnectionForm) getVisibleIndices() []int {
 	} else if m.mode == "command" {
 		indices = append(indices, 7)
 	}
-	// Project (index 8) is always visible, same as Driver/Name, regardless
-	// of credentials/url/command mode
-	indices = append(indices, 8)
 	return indices
 }
 
@@ -266,6 +262,5 @@ func (m ConnectionForm) toDbConnection() adapters.DbConnection {
 		Password: m.inputs[5].Value(),
 		Url:      m.inputs[6].Value(),
 		Command:  m.inputs[7].Value(),
-		Project:  m.inputs[8].Value(),
 	}
 }

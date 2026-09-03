@@ -20,7 +20,10 @@ type DbConnection struct {
 	Driver   string
 	Command  string
 	Url      string
-	Project  string // Groups connections under a project (e.g. "PMO", "PMC"), like LazyCurl
+	// No separate Project field - a connection's Name IS its project alias
+	// (e.g. "PMO" -> localhost:5432), so a second optional grouping tag was
+	// redundant once the Connection Manager stopped supporting multiple
+	// connections per project.
 }
 
 type Database interface {

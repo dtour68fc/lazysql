@@ -89,9 +89,3 @@ func createPasswordInput(value string) textinput.Model {
 	ti.EchoCharacter = '•'
 	return ti
 }
-
-func createProjectInput(value string) textinput.Model {
-	ti := createTextInput(value)
-	ti.Placeholder = "Project (optional)"
-	return ti
-}
