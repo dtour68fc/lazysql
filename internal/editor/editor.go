@@ -96,6 +96,25 @@ func (m EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		newEditor, sizeCmd := m.editor.SetSize(m.layout.EditorWidth-2, m.layout.EditorHeight-2)
 		m.editor = newEditor.(vimtea.Editor)
 		cmd = sizeCmd
+	case vimtea.CommandMsg:
+		// vimtea's own AddCommand registry only actually works for
+		// zero-arg commands in real use - by the time its CommandMsg
+		// makes it back through Update(), the buffer it re-reads to
+		// parse args has already been cleared. So instead of fighting
+		// that, we parse the raw ":..." text ourselves here, straight
+		// off the message, for the query shorthand DSL (":sa users",
+		// ":s(col1,col2) users", chained ":j other on a.x=b.y" joins).
+		// Anything that doesn't match just falls through to vimtea's own
+		// handling below (which will show "Unknown command" for genuine
+		// typos, same as always).
+		if query, autoRun, ok := parseShorthandQuery(msg.Command); ok {
+			buf := m.editor.GetBuffer()
+			buf.Clear()
+			buf.InsertAt(0, 0, query)
+			if autoRun {
+				cmd = m.runQuery(query)
+			}
+		}
 	}
 	newEditor, newCmd := m.editor.Update(msg)
 	m.editor = newEditor.(vimtea.Editor)
