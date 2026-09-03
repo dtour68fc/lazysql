@@ -273,7 +273,11 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd = m.changeSelectedConnection(m.selectedConnectionIndex)
 			}
 			m.viewport.SetContent(m.contentUI())
-		case "tab":
+		case "H", "L":
+			// Shift+H/Shift+L switch Projects/Tables sub-tabs, matching
+			// LazyCurl's Shift+H/L Collections/Envs convention. Plain tab
+			// is reserved globally for cycling between the Projects/
+			// Editor/Viewer panes instead (see AppModel).
 			if m.activeTab == "tables" {
 				m.activeTab = "projects"
 			} else {

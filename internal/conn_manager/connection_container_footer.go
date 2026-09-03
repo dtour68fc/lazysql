@@ -21,7 +21,7 @@ func normalFooter() string {
 		"Edit (e)",
 		"Save (s)",
 		"Navigate (j,k)",
-		"Switch Projects/Tables (tab)",
+		"Switch Projects/Tables (shift+h/l)",
 		"Change Mode (m)",
 		"Help (?)",
 	)

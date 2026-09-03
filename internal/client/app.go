@@ -1,20 +1,24 @@
 package client
 
 import (
+	"fmt"
+	"os"
+
 	conn_manager "app.lazygit/internal/conn_manager"
 	utils "app.lazygit/internal/utils"
 	tea "github.com/charmbracelet/bubbletea"
 	lipgloss "github.com/charmbracelet/lipgloss"
 )
 
+// AppModel keeps the Connection Manager (Projects/Tables) permanently
+// visible as pane 1, with Editor (pane 2) and Viewer (pane 3) on the right -
+// always all three, never a full-screen toggle between "browsing projects"
+// and "writing a query". Connecting to a project just makes Editor/Viewer
+// go from placeholder to live; it never hides the Connection Manager.
 type AppModel struct {
-	// connectionManager stays alive for the whole program run (never
-	// destroyed on connect) so switching back to it with ctrl+p restores
-	// exactly where you left off - same Projects list, same loaded Tables
-	// tab state - instead of losing it and starting over.
-	connectionManager   tea.Model
-	connectionContainer tea.Model // nil until a connection succeeds at least once
-	showingContainer    bool
+	connectionManager   conn_manager.ConnectionManager
+	connectionContainer *ConnectionContainerModel // nil until a connection succeeds at least once
+	activePane          string                    // "manager" | "editor" | "viewer"
 	width               int
 	height              int
 }
@@ -26,11 +30,22 @@ func StartApp() {
 func initModel() AppModel {
 	return AppModel{
 		connectionManager: conn_manager.InitConnectionManager(),
+		activePane:        "manager",
 	}
 }
 
 func (m AppModel) Init() tea.Cmd {
 	return m.connectionManager.Init()
+}
+
+// rightWidth computes how much horizontal space Editor/Viewer get, given
+// whatever the Connection Manager panel ends up sizing itself to.
+func (m AppModel) rightWidth() int {
+	w := m.width - m.connectionManager.PanelWidth()
+	if w < 20 {
+		w = 20
+	}
+	return w
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -42,96 +57,214 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "ctrl+p":
-			// Switch back to the Projects list (Connection Manager)
-			// without losing it or the connected screen - go pick a
-			// different connection, or ctrl+p again... actually there's
-			// no need to toggle back to the container from here; opening
-			// a NEW connection (or the same one) re-enters it via
-			// ConnectedMsg same as the first time.
-			if m.showingContainer {
-				m.showingContainer = false
+		}
+
+		canJumpPanes := !m.connectionManager.IsEditingConnection() &&
+			!m.connectionManager.IsShowingHelp() &&
+			!(m.activePane == "editor" && m.connectionContainer != nil && m.connectionContainer.IsEditorCapturingInput())
+
+		if canJumpPanes {
+			switch msg.String() {
+			case "1", "ctrl+p":
+				m.activePane = "manager"
 				return m, nil
+			case "2":
+				m.activePane = "editor"
+				return m.applyActiveViewChanged("editor")
+			case "3":
+				m.activePane = "viewer"
+				return m.applyActiveViewChanged("viewer")
+			case "tab":
+				return m.cyclePane(1)
+			case "shift+tab":
+				return m.cyclePane(-1)
 			}
 		}
 	case conn_manager.ConnectedMsg:
-		m.connectionContainer = InitConnectionContainer(msg.Database)
-		m.showingContainer = true
-		return m, m.connectionContainer.Init()
+		cc := InitConnectionContainer(msg.Database)
+		m.connectionContainer = &cc
+		m.activePane = "editor"
+		var sizeCmd tea.Cmd
+		if m.width > 0 {
+			updated, cmd := m.connectionContainer.Update(tea.WindowSizeMsg{Width: m.rightWidth(), Height: m.height})
+			*m.connectionContainer = updated
+			sizeCmd = cmd
+		}
+		return m, tea.Batch(m.connectionContainer.Init(), sizeCmd, m.applyActiveViewChangedCmd("editor"))
 	}
 
-	// Keep whichever screen is actually visible fully updated. The hidden
-	// one only needs tea.WindowSizeMsg to stay correctly sized for later -
-	// forwarding every message (especially keystrokes) to it while hidden
-	// would leak them: e.g. pressing 's' while writing a SQL query would
-	// also silently trigger "save connection" in the hidden Connection
-	// Manager, or 'j'/'k' would move its list cursor out from under you.
-	var cmCmd, ccCmd tea.Cmd
-	if m.showingContainer {
-		if _, ok := msg.(tea.WindowSizeMsg); ok {
-			m.connectionManager, cmCmd = m.connectionManager.Update(msg)
+	return m.routeToActivePane(msg)
+}
+
+// applyActiveViewChanged tells the connected screen's editor/viewer which
+// one is focused (so their border highlights correctly).
+func (m AppModel) applyActiveViewChanged(view string) (tea.Model, tea.Cmd) {
+	return m, m.applyActiveViewChangedCmd(view)
+}
+
+func (m AppModel) applyActiveViewChangedCmd(view string) tea.Cmd {
+	if m.connectionContainer == nil {
+		return nil
+	}
+	return func() tea.Msg { return utils.ActiveViewChanged(view) }
+}
+
+// cyclePane moves focus forward (delta=1) or backward (delta=-1) through
+// all three panes: Projects/Tables (manager) -> Editor -> Viewer -> back to
+// manager. Global, always active regardless of which pane currently has
+// focus - the Connection Manager's OWN Projects/Tables sub-tab switch uses
+// shift+h/shift+l instead (see conn_list.go), matching LazyCurl's
+// Collections/Envs convention, so plain tab is free for this.
+func (m AppModel) cyclePane(delta int) (tea.Model, tea.Cmd) {
+	order := []string{"manager", "editor", "viewer"}
+	idx := 0
+	for i, p := range order {
+		if p == m.activePane {
+			idx = i
+			break
 		}
+	}
+	idx = (idx + delta + len(order)) % len(order)
+	m.activePane = order[idx]
+	if m.activePane != "manager" {
+		return m.applyActiveViewChanged(m.activePane)
+	}
+	return m, nil
+}
+
+// routeToActivePane sends msg (if non-nil) to whichever pane currently has
+// focus, and ALWAYS keeps the Connection Manager and the connected screen's
+// editor/viewer updated for non-keystroke messages (async data loads,
+// resize, etc.) - only raw keystrokes are exclusive to the focused pane, so
+// e.g. pressing 's' while writing a query doesn't also silently trigger
+// "save connection" in the (still-visible, but unfocused) Connection
+// Manager pane.
+func (m AppModel) routeToActivePane(msg tea.Msg) (tea.Model, tea.Cmd) {
+	_, isKey := msg.(tea.KeyMsg)
+
+	if !isKey {
+		var cmCmd, ccCmd tea.Cmd
+		var updatedCM tea.Model
+		updatedCM, cmCmd = m.connectionManager.Update(msg)
+		m.connectionManager = updatedCM.(conn_manager.ConnectionManager)
 		if m.connectionContainer != nil {
-			m.connectionContainer, ccCmd = m.connectionContainer.Update(msg)
+			// Split the shared width/height message into the narrower
+			// right-hand size the connected screen actually gets.
+			if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
+				wsMsg = tea.WindowSizeMsg{Width: m.rightWidth(), Height: wsMsg.Height}
+				updated, cmd := m.connectionContainer.Update(wsMsg)
+				*m.connectionContainer = updated
+				ccCmd = cmd
+			} else {
+				updated, cmd := m.connectionContainer.Update(msg)
+				*m.connectionContainer = updated
+				ccCmd = cmd
+			}
 		}
-	} else {
-		m.connectionManager, cmCmd = m.connectionManager.Update(msg)
+		return m, tea.Batch(cmCmd, ccCmd)
 	}
 
-	return m, tea.Batch(cmCmd, ccCmd)
+	switch m.activePane {
+	case "manager":
+		updated, cmd := m.connectionManager.Update(msg)
+		m.connectionManager = updated.(conn_manager.ConnectionManager)
+		return m, cmd
+	case "editor":
+		if m.connectionContainer == nil {
+			return m, nil
+		}
+		updated, cmd := m.connectionContainer.UpdateEditor(msg)
+		*m.connectionContainer = updated
+		return m, cmd
+	case "viewer":
+		if m.connectionContainer == nil {
+			return m, nil
+		}
+		updated, cmd := m.connectionContainer.UpdateViewer(msg)
+		*m.connectionContainer = updated
+		return m, cmd
+	}
+	return m, nil
 }
 
 func (m AppModel) View() string {
-	if m.showingContainer && m.connectionContainer != nil {
-		// Already connected - ConnectionContainerModel renders its own
-		// full Editor/Viewer layout.
-		return m.connectionContainer.View()
-	}
-
-	cm, ok := m.connectionManager.(conn_manager.ConnectionManager)
-	if !ok || cm.IsShowingHelp() {
+	if m.connectionManager.IsShowingHelp() {
 		return m.connectionManager.View()
 	}
-	return m.renderPreConnectLayout(cm)
-}
 
-// renderPreConnectLayout hangs the Connection Manager panel on the left,
-// with empty Editor/Viewer placeholder panels on the right showing there's
-// no query or data yet - so the app looks like its final layout from the
-// moment it starts, instead of a single box floating in the middle of the
-// screen.
-func (m AppModel) renderPreConnectLayout(cm conn_manager.ConnectionManager) string {
-	left := cm.RenderPanel()
-	panelHeight := cm.PanelHeight()
+	left := m.connectionManager.RenderPanel()
+	panelHeight := m.connectionManager.PanelHeight()
+	rw := m.rightWidth()
 
-	rightWidth := m.width - cm.PanelWidth()
-	if rightWidth < 20 {
-		rightWidth = 20
+	var editorView, viewerView string
+	if m.connectionContainer != nil {
+		editorView = m.connectionContainer.EditorView()
+		viewerView = m.connectionContainer.ViewerView()
+	} else {
+		editorHeight := panelHeight * 25 / 100
+		viewerHeight := panelHeight - editorHeight
+		editorView = utils.RenderPanel(
+			"2 Editor",
+			"No connection yet.\n\nConnect to a database (pane 1) to start writing a query.",
+			rw, editorHeight, m.activePane == "editor",
+		)
+		viewerView = utils.RenderPanel(
+			"3 Viewer",
+			"No data yet.",
+			rw, viewerHeight, m.activePane == "viewer",
+		)
 	}
 
-	editorHeight := panelHeight * 25 / 100
-	viewerHeight := panelHeight - editorHeight
-
-	editorPlaceholder := utils.RenderPanel(
-		"1 Editor",
-		"No connection yet.\n\nConnect to a database (left) to start writing a query.",
-		rightWidth, editorHeight, false,
-	)
-	viewerPlaceholder := utils.RenderPanel(
-		"2 Viewer",
-		"No data yet.",
-		rightWidth, viewerHeight, false,
-	)
-	right := lipgloss.JoinVertical(lipgloss.Left, editorPlaceholder, viewerPlaceholder)
-
+	right := lipgloss.JoinVertical(lipgloss.Left, editorView, viewerView)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	footer := m.buildFooter()
+
+	full := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 
 	if m.width <= 0 || m.height <= 0 {
-		return body
+		return full
 	}
-	// Top-aligned rather than centered - the panel now fills the full
-	// available height itself, so there's nothing left to center; Top
-	// keeps any rounding-error slack (e.g. tiny terminals hitting the
-	// MIN_HEIGHT floor) at the bottom instead of splitting it top/bottom.
-	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, body)
+	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, full)
+}
+
+func (m AppModel) buildFooter() string {
+	badgeLabel := map[string]string{
+		"manager": "1 PROJECTS",
+		"editor":  "2 EDITOR",
+		"viewer":  "3 VIEWER",
+	}[m.activePane]
+	badgeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#1e1e2e")).
+		Background(lipgloss.Color("141")).
+		Bold(true).
+		Padding(0, 1)
+	badge := badgeStyle.Render(badgeLabel)
+
+	universal := "1/2/3: jump pane, tab/shift+tab: cycle panes"
+	var specific string
+	switch m.activePane {
+	case "manager":
+		specific = "enter/space: load tables, shift+n: new project, e: edit, s: save, j/k: navigate, shift+h/l: projects/tables"
+	case "editor":
+		specific = "ctrl+r or ctrl+s: run query"
+	case "viewer":
+		specific = "j/k: rows, h/l: columns"
+	}
+
+	bindings := fmt.Sprintf("%s | %s", universal, specific)
+	pid := fmt.Sprintf("PID: %d", os.Getpid())
+
+	left := lipgloss.JoinHorizontal(lipgloss.Top,
+		badge,
+		lipgloss.NewStyle().Padding(0, 1).Render(bindings),
+	)
+	right := lipgloss.NewStyle().Padding(0, 1).Render(pid)
+
+	spacerWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
+	if spacerWidth < 0 {
+		spacerWidth = 0
+	}
+	spacer := lipgloss.NewStyle().Width(spacerWidth).Render("")
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, spacer, right)
 }

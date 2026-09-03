@@ -279,6 +279,12 @@ func (m ConnectionManager) PanelHeight() int { return m.layout.WinHeight }
 // composing the hung-left layout (the help screen wants the whole terminal).
 func (m ConnectionManager) IsShowingHelp() bool { return m.showHelp }
 
+// IsEditingConnection reports whether the New/Edit Connection modal is
+// currently open (typing into Host/Port/Username/etc.) - global pane-jump
+// keys (1/2/3, tab) must not be intercepted while true, or typing a literal
+// "1" or pressing tab to move between fields would get hijacked instead.
+func (m ConnectionManager) IsEditingConnection() bool { return m.editingConnection }
+
 func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager, tea.Cmd) {
 	var command tea.Cmd
 	switch msg := msg.(type) {
