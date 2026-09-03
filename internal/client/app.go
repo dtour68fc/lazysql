@@ -288,6 +288,11 @@ func (m AppModel) View() string {
 		// having it overflow past the panel's own border.
 		return m.connectionManager.View()
 	}
+	if m.connectionManager.IsDumping() {
+		// Same reasoning as IsEditingConnection above - the ctrl+d dump
+		// modal is also ~70 cols, too wide for the narrow panel.
+		return m.connectionManager.View()
+	}
 
 	left := m.connectionManager.RenderPanel()
 	panelHeight := m.connectionManager.PanelHeight()

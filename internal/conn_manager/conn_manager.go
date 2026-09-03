@@ -455,6 +455,15 @@ func (m ConnectionManager) View() string {
 		// own border.
 		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, m.form.View())
 	}
+	if m.IsDumping() {
+		// Same full-screen takeover as editingConnection above - the
+		// dump modal is 70 cols wide too, and was getting squeezed into
+		// the narrow panel body (wrapping the title/path text awkwardly)
+		// instead of centered over the whole screen.
+		if list, ok := m.list.(ConnectionList); ok {
+			return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, list.renderDumpModal())
+		}
+	}
 
 	return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, m.RenderPanel())
 }
