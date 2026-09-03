@@ -211,6 +211,29 @@ func (m ConnectionList) projectRows() []adapters.DbConnection {
 	return rows
 }
 
+// reloadHoveredProject re-fires LoadDatabasesMsg for whichever project row
+// is currently hovered in the Projects tab - same effect as enter/space,
+// used by "r" as an explicit "reconnect this" action (e.g. after fixing a
+// bad password and wanting to retry without leaving the row).
+func (m *ConnectionList) reloadHoveredProject() tea.Cmd {
+	if m.activeTab != "projects" || !m.hasRealConnections {
+		return nil
+	}
+	rows := m.projectRows()
+	if m.selectedConnectionIndex < 0 || m.selectedConnectionIndex >= len(m.connections) || len(rows) == 0 {
+		return nil
+	}
+	selected := m.connections[m.selectedConnectionIndex]
+	if selected.Name == "New Connection" && selected.Host == "" {
+		return nil
+	}
+	m.activeTab = "databases"
+	m.databasesLoading = true
+	m.databasesProjectName = selected.Name
+	m.viewport.SetContent(m.contentUI())
+	return func() tea.Msg { return LoadDatabasesMsg(selected) }
+}
+
 // databasesLocked reports whether the Databases tab should be locked/greyed
 // out: true if there are no real connections at all, or no server has been
 // connected to (its database list loaded) yet this session.
@@ -570,6 +593,12 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+		case "r":
+			// Reload/reconnect the hovered project - same as enter/space
+			// on a project row, just with explicit "refresh this" intent
+			// (e.g. after fixing a bad password and wanting to retry
+			// without leaving the row and coming back).
+			cmd = m.reloadHoveredProject()
 		case "enter", " ", "l", "right":
 			// "l"/"right" are netrw/oil.nvim-style "go into" alternatives
 			// to enter/space - "h"/"left"/esc above is the matching "go

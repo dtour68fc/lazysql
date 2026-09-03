@@ -442,17 +442,26 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		command = tea.Batch(databasesCmd, connectedCmd, continueCmd)
 	case DatabasesErrorMsgInternal:
-		errCmd := func() tea.Msg {
-			return DatabasesStateMsg{Err: msg.Err, ProjectName: msg.ProjectName}
-		}
 		// If this failure was for the project we're trying to auto-
 		// restore on startup (session.go), don't just give up on the
 		// first failed attempt - the server might just not be reachable
 		// yet this early in boot (slow to come up, network still
 		// settling, etc). Keep retrying on an interval until it actually
 		// connects, instead of silently leaving you on a dead session.
+		isRestoreRetry := m.pendingRestoreSession.ProjectName == msg.ProjectName
+		errMsg := msg.Err
+		if isRestoreRetry {
+			// Say so explicitly - a bare error message here looked
+			// identical to "gave up permanently", with nothing on screen
+			// actually indicating a retry was coming, so it just looked
+			// broken/stuck for the whole interval between attempts.
+			errMsg = fmt.Sprintf("%s (restoring last session, retrying in %s...)", msg.Err, retryRestoreInterval)
+		}
+		errCmd := func() tea.Msg {
+			return DatabasesStateMsg{Err: errMsg, ProjectName: msg.ProjectName}
+		}
 		var retryCmd tea.Cmd
-		if m.pendingRestoreSession.ProjectName == msg.ProjectName {
+		if isRestoreRetry {
 			retryCmd = retryRestoreCmd(msg.ProjectName)
 		}
 		command = tea.Batch(errCmd, retryCmd)
