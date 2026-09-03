@@ -147,30 +147,24 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m ConnectionManager) View() string {
-	header := lipgloss.NewStyle().Width(m.layout.WinWidth).Height(m.layout.HeaderHeight).Padding(1).Render("Connection Manager")
-	footer := m.buildFooter()
-
-	listView := m.list.View()
-	formView := m.form.View()
-	listAndFormView := lipgloss.JoinHorizontal(lipgloss.Top, listView, formView)
-	body := lipgloss.NewStyle().
-		Width(m.layout.WinWidth).
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		Height(m.layout.BodyHeight).
-		Render(listAndFormView)
-
-	container := utils.Border().Width(m.layout.WinWidth).Height(m.layout.WinHeight).Render(
-		lipgloss.JoinVertical(lipgloss.Top, header, body, footer),
-	)
-
-	base := lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, container)
-
 	if m.showHelp {
 		helpView := renderHelp(m.layout.HelpWidth, m.layout.HelpHeight)
 		return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, helpView)
 	}
 
-	return base
+	footer := m.buildFooter()
+	listView := m.list.View()
+	formView := m.form.View()
+	listAndFormView := lipgloss.JoinHorizontal(lipgloss.Top, listView, formView)
+	body := lipgloss.JoinVertical(lipgloss.Top, listAndFormView, footer)
+
+	// Same panel style as the connected screen (explorer/editor/viewer) -
+	// title embedded directly in the rounded border, matching LazyCurl,
+	// instead of a separate "Connection Manager" text line + rule inside a
+	// plain box.
+	container := utils.RenderPanel("Connection Manager", body, m.layout.WinWidth, m.layout.WinHeight, true)
+
+	return lipgloss.Place(m.layout.ScreenWidth, m.layout.ScreenHeight, lipgloss.Center, lipgloss.Center, container)
 }
 
 func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager, tea.Cmd) {
