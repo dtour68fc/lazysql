@@ -29,6 +29,12 @@ type DbConnection struct {
 	Driver   string
 	Command  string
 	Url      string
+	// Database is the specific database name this connection's tables
+	// should be listed from (e.g. "pmo_db"). Optional - if empty, the
+	// Tables tab falls back to whichever database GetDatabases() happens
+	// to return first, which is often just the empty admin "postgres"/
+	// "mysql" database, not the one the user actually cares about.
+	Database string
 	// No separate Project field - a connection's Name IS its project alias
 	// (e.g. "PMO" -> localhost:5432), so a second optional grouping tag was
 	// redundant once the Connection Manager stopped supporting multiple

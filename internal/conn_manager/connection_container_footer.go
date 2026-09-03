@@ -42,6 +42,9 @@ func renderHelp(width int, height int) string {
 - Driver is used to establish and find the database server
  * Cycle between the supported drivers with h/l or left/right arrows
  * PostgreSQL (pgx) and MySQL (mysql) are currently supported
+- Database (optional) picks which specific database the Tables tab and
+  editor queries target - leave blank and it'll guess (the first one
+  GetDatabases() returns, often just the empty admin db)
 - Quit this dialog by hitting "?" or "esc"
 	`
 	return lipgloss.NewStyle().

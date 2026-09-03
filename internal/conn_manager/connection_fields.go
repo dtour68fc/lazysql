@@ -89,3 +89,9 @@ func createPasswordInput(value string) textinput.Model {
 	ti.EchoCharacter = '•'
 	return ti
 }
+
+func createDatabaseInput(value string) textinput.Model {
+	ti := createTextInput(value)
+	ti.Placeholder = "Database (optional, e.g. pmo_db)"
+	return ti
+}

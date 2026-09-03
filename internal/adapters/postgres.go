@@ -15,10 +15,19 @@ type Postgres struct {
 }
 
 func InitPostgres(dbConnection *DbConnection) *Postgres {
+	// If the connection specifies a target Database, start there instead
+	// of the default admin "postgres" db - otherwise RunQuery() (which
+	// always targets whatever currentDatabase currently is) would keep
+	// hitting "postgres" until something else happened to redirect it,
+	// silently running every query against the wrong database.
+	currentDatabase := "postgres"
+	if dbConnection.Database != "" {
+		currentDatabase = dbConnection.Database
+	}
 	return &Postgres{
 		dbConnection:    dbConnection,
 		db:              nil,
-		currentDatabase: "postgres",
+		currentDatabase: currentDatabase,
 		sessionManager:  session_manager.InitSessionManager(),
 	}
 }
@@ -115,6 +124,12 @@ func (p *Postgres) RunQuery(query string) ([][]string, error) {
 		return nil, err
 	}
 	return p.InspectRows(rows)
+}
+
+// CurrentDatabaseForTest exposes currentDatabase for tests confirming
+// InitPostgres seeds it correctly from DbConnection.Database.
+func (p *Postgres) CurrentDatabaseForTest() string {
+	return p.currentDatabase
 }
 
 func (p *Postgres) InspectRows(rows *sql.Rows) ([][]string, error) {

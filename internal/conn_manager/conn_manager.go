@@ -34,6 +34,7 @@ type ConnectionManager struct {
 	// the user finally opens the full 3-pane screen from the Tables tab.
 	activeDatabase       adapters.Database
 	activeConnectionName string
+	activeDatabaseName   string
 }
 
 type SelectedConnectionMsg adapters.DbConnection
@@ -43,10 +44,13 @@ type ConnectionErrorMsg string
 // ConnectedMsg signals a successful connection to AppModel. ProjectName is
 // used to label the Tables tab once we're connected - if empty (the "quick
 // connect while editing" shortcut doesn't necessarily have a saved name),
-// a generic label is used instead.
+// a generic label is used instead. DatabaseName is which database to list
+// tables from (see DbConnection.Database) - empty falls back to guessing
+// via GetDatabases()[0].
 type ConnectedMsg struct {
-	Database    adapters.Database
-	ProjectName string
+	Database     adapters.Database
+	ProjectName  string
+	DatabaseName string
 }
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
@@ -74,37 +78,47 @@ func (m ConnectionManager) quickConnectFromForm() tea.Cmd {
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to connect: %s", err))
 		}
-		return ConnectedMsg{Database: database, ProjectName: name}
+		return ConnectedMsg{Database: database, ProjectName: name, DatabaseName: connection.Database}
 	}
 }
 
 // loadTablesForProject connects to the given (saved) connection and fetches
 // its tables, without leaving the Connection Manager screen - populates the
-// Tables tab in place. Picks the first database InitConnection's target
-// returns from GetDatabases() (there's no per-connection "default database"
-// concept in DbConnection today).
+// Tables tab in place. Uses conn.Database if the connection specifies one;
+// otherwise falls back to whichever database GetDatabases() returns first
+// (which is often just the empty admin "postgres"/"mysql" database, not the
+// one with the tables you actually care about - specify Database if so).
 func (m ConnectionManager) loadTablesForProject(conn adapters.DbConnection) tea.Cmd {
 	return func() tea.Msg {
 		database, err := conn.InitConnection()
 		if err != nil {
 			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
 		}
-		return fetchTablesMsg(conn.Name, database)
+		return fetchTablesMsg(conn.Name, database, conn.Database)
 	}
 }
 
 // fetchTablesForLiveConnection is loadTablesForProject's counterpart for a
 // connection that's already established (e.g. the "quick connect while
 // editing" shortcut) - lists its tables without reconnecting.
-func fetchTablesForLiveConnection(name string, database adapters.Database) tea.Cmd {
+func fetchTablesForLiveConnection(name string, database adapters.Database, databaseName string) tea.Cmd {
 	return func() tea.Msg {
-		return fetchTablesMsg(name, database)
+		return fetchTablesMsg(name, database, databaseName)
 	}
 }
 
-// fetchTablesMsg does the actual GetDatabases -> GetTables(first) work
-// shared by both connect paths.
-func fetchTablesMsg(name string, database adapters.Database) tea.Msg {
+// fetchTablesMsg does the actual GetTables work shared by both connect
+// paths. If databaseName is given explicitly, uses it directly; otherwise
+// falls back to whichever database GetDatabases() happens to return first.
+func fetchTablesMsg(name string, database adapters.Database, databaseName string) tea.Msg {
+	if databaseName != "" {
+		tables, err := database.GetTables(databaseName)
+		if err != nil {
+			return TablesErrorMsgInternal{ProjectName: name, Err: err.Error()}
+		}
+		return TablesLoadedMsgInternal{ProjectName: name, Database: database, Tables: tables}
+	}
+
 	databases, err := database.GetDatabases()
 	if err != nil {
 		return TablesErrorMsgInternal{ProjectName: name, Err: err.Error()}
@@ -236,10 +250,11 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// need to reconnect just to list its tables.
 		m.activeDatabase = msg.Database
 		m.activeConnectionName = msg.ProjectName
+		m.activeDatabaseName = msg.DatabaseName
 		loadingMsgCmd := func() tea.Msg {
 			return TablesStateMsg{Loading: true, ProjectName: msg.ProjectName}
 		}
-		command = tea.Batch(loadingMsgCmd, fetchTablesForLiveConnection(msg.ProjectName, msg.Database))
+		command = tea.Batch(loadingMsgCmd, fetchTablesForLiveConnection(msg.ProjectName, msg.Database, msg.DatabaseName))
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
 	case SavedConnectionsLoaded:
@@ -251,6 +266,7 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LoadTablesMsg:
 		conn := adapters.DbConnection(msg)
 		m.connectionError = ""
+		m.activeDatabaseName = conn.Database
 		loadingMsgCmd := func() tea.Msg {
 			return TablesStateMsg{Loading: true, ProjectName: conn.Name}
 		}
@@ -269,8 +285,9 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.activeDatabase != nil {
 			db := m.activeDatabase
 			name := m.activeConnectionName
+			dbName := m.activeDatabaseName
 			command = func() tea.Msg {
-				return ConnectedMsg{Database: db, ProjectName: name}
+				return ConnectedMsg{Database: db, ProjectName: name, DatabaseName: dbName}
 			}
 		}
 	}

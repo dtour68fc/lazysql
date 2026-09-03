@@ -15,10 +15,16 @@ type Mysql struct {
 }
 
 func InitMySQL(dbConnection *DbConnection) *Mysql {
+	// See InitPostgres for why this defaults to dbConnection.Database when
+	// set, instead of always starting at the admin "mysql" db.
+	currentDatabase := "mysql"
+	if dbConnection.Database != "" {
+		currentDatabase = dbConnection.Database
+	}
 	return &Mysql{
 		dbConnection:    dbConnection,
 		db:              nil,
-		currentDatabase: "mysql",
+		currentDatabase: currentDatabase,
 		sessionManager:  session_manager.InitSessionManager(),
 	}
 }
