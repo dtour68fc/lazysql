@@ -82,10 +82,14 @@ func InitTable(data [][]string, width int, height int) Table {
 		SelectedColumn:      0,
 		ColumnsStyle:        lipgloss.NewStyle().Bold(true),
 		SelectedRowStyle:    lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
-		SelectedColumnStyle: lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
-		SelectedCellStyle:   lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
-		MarkedStyle:         lipgloss.NewStyle().Background(lipgloss.Color("208")).Foreground(lipgloss.Color("0")),
-		Viewport:            viewport,
+		SelectedColumnStyle: lipgloss.NewStyle().Background(lipgloss.Color("60")).Foreground(lipgloss.Color("229")),
+		SelectedCellStyle:   lipgloss.NewStyle().Background(lipgloss.Color("63")).Foreground(lipgloss.Color("229")),
+		// A different shade of the same purple/blue family as the hover
+		// highlights above (57/60/63), not an unrelated color like orange -
+		// still clearly a different shade so marked vs hovered don't look
+		// identical, without clashing with the rest of the app's palette.
+		MarkedStyle: lipgloss.NewStyle().Background(lipgloss.Color("97")).Foreground(lipgloss.Color("255")),
+		Viewport:    viewport,
 		MarkedRows:          map[int]bool{},
 		MarkedColumns:       map[int]bool{},
 		columnWidths:        calculateColumnWidths(cols, rows),
