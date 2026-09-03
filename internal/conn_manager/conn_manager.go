@@ -26,6 +26,14 @@ type ConnectionManager struct {
 	savingConnection       bool
 	showHelp               bool
 	connectionError        string
+
+	// Active project state - populated once space/enter loads a project's
+	// tables in place (see LoadTablesMsg/OpenActiveConnectionMsg in
+	// conn_list.go). Kept here (not in the list) since it holds the live
+	// adapters.Database connection, reused rather than reconnecting when
+	// the user finally opens the full 3-pane screen from the Tables tab.
+	activeDatabase       adapters.Database
+	activeConnectionName string
 }
 
 type SelectedConnectionMsg adapters.DbConnection
@@ -42,7 +50,11 @@ func setLayout(width int, height int) tea.Cmd {
 	}
 }
 
-func (m ConnectionManager) establishConnection() tea.Cmd {
+// quickConnectFromForm connects using whatever's currently typed into the
+// form (used only while actively editing a connection, as a "test this
+// connection right now" shortcut) and jumps straight to the full 3-pane
+// screen on success.
+func (m ConnectionManager) quickConnectFromForm() tea.Cmd {
 	form := m.form.(ConnectionForm)
 	connection := form.toDbConnection()
 	return func() tea.Msg {
@@ -52,6 +64,46 @@ func (m ConnectionManager) establishConnection() tea.Cmd {
 		}
 		return ConnectedMsg(database)
 	}
+}
+
+// loadTablesForProject connects to the given (saved) connection and fetches
+// its tables, without leaving the Connection Manager screen - populates the
+// Tables tab in place. Picks the first database InitConnection's target
+// returns from GetDatabases() (there's no per-connection "default database"
+// concept in DbConnection today).
+func (m ConnectionManager) loadTablesForProject(conn adapters.DbConnection) tea.Cmd {
+	return func() tea.Msg {
+		database, err := conn.InitConnection()
+		if err != nil {
+			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
+		}
+		databases, err := database.GetDatabases()
+		if err != nil {
+			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
+		}
+		if len(databases) == 0 {
+			return TablesLoadedMsgInternal{ProjectName: conn.Name, Database: database, Tables: nil}
+		}
+		tables, err := database.GetTables(databases[0])
+		if err != nil {
+			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
+		}
+		return TablesLoadedMsgInternal{ProjectName: conn.Name, Database: database, Tables: tables}
+	}
+}
+
+// TablesLoadedMsgInternal / TablesErrorMsgInternal carry the live
+// adapters.Database (which conn_list.go can't reference without an import
+// cycle concern - it's kept in ConnectionManager instead) alongside the
+// fetch result.
+type TablesLoadedMsgInternal struct {
+	ProjectName string
+	Database    adapters.Database
+	Tables      []string
+}
+type TablesErrorMsgInternal struct {
+	ProjectName string
+	Err         string
 }
 
 func (m ConnectionManager) toggleConnectionEdit() tea.Cmd {
@@ -95,6 +147,14 @@ func (m ConnectionManager) saveConnection() tea.Cmd {
 	}
 }
 
+// hasRealConnectionsCmd tells the list whether there are any real saved
+// connections, right after they're (re)loaded.
+func hasRealConnectionsCmd(has bool) tea.Cmd {
+	return func() tea.Msg {
+		return HasRealConnectionsMsg(has)
+	}
+}
+
 func InitConnectionManager() ConnectionManager {
 	var connections []adapters.DbConnection
 	width, height, err := term.GetSize(int(os.Stdin.Fd()))
@@ -132,10 +192,32 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.layout = utils.ConnectionManagerLayout(msg)
 	case SavedConnectionsLoaded:
 		m.connectionsByName = map[string]adapters.DbConnection(msg)
-		command = m.loadConnections()
+		command = tea.Batch(m.loadConnections(), hasRealConnectionsCmd(len(m.connectionsByName) > 0))
 	case SelectedConnectionMsg:
 		conn := adapters.DbConnection(msg)
 		m.selectedConnectionName = conn.Name
+	case LoadTablesMsg:
+		conn := adapters.DbConnection(msg)
+		m.connectionError = ""
+		loadingMsgCmd := func() tea.Msg {
+			return TablesStateMsg{Loading: true, ProjectName: conn.Name}
+		}
+		command = tea.Batch(loadingMsgCmd, m.loadTablesForProject(conn))
+	case TablesLoadedMsgInternal:
+		m.activeDatabase = msg.Database
+		m.activeConnectionName = msg.ProjectName
+		command = func() tea.Msg {
+			return TablesStateMsg{ProjectName: msg.ProjectName, Tables: msg.Tables}
+		}
+	case TablesErrorMsgInternal:
+		command = func() tea.Msg {
+			return TablesStateMsg{Err: msg.Err, ProjectName: msg.ProjectName}
+		}
+	case OpenActiveConnectionMsg:
+		if m.activeDatabase != nil {
+			db := m.activeDatabase
+			command = func() tea.Msg { return ConnectedMsg(db) }
+		}
 	}
 
 	if !m.editingConnection {
@@ -190,11 +272,34 @@ func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			m.connecting = true
-			m.editingConnection = false
-			connectionCommand := m.establishConnection()
-			toggleConnectionCommand := m.toggleConnectionEdit()
-			command = tea.Batch(connectionCommand, toggleConnectionCommand)
+			// While actively editing a connection, Enter is a "test this
+			// connection right now" shortcut using whatever's currently
+			// typed into the form, jumping straight to the full screen on
+			// success. When NOT editing, Enter is owned by the list
+			// instead (space/enter on a project row loads its tables in
+			// place; enter on a table row opens the full screen using the
+			// connection already established for that - see LoadTablesMsg
+			// / OpenActiveConnectionMsg in conn_list.go).
+			if m.editingConnection {
+				m.connecting = true
+				m.editingConnection = false
+				connectionCommand := m.quickConnectFromForm()
+				toggleConnectionCommand := m.toggleConnectionEdit()
+				command = tea.Batch(connectionCommand, toggleConnectionCommand)
+			}
+		case "N":
+			// Shift+N: jump straight to a blank "New Connection" and start
+			// editing it immediately, same affordance as LazyCurl's
+			// Shift+P/Shift+N "create from scratch" shortcuts.
+			if !m.editingConnection {
+				blank := initializeNewConnection()
+				m.selectedConnectionName = ""
+				m.editingConnection = true
+				m.connecting = false
+				m.connectionError = ""
+				selectCmd := func() tea.Msg { return SelectedConnectionMsg(blank) }
+				command = tea.Batch(selectCmd, m.toggleConnectionEdit())
+			}
 		case "e":
 			if !m.editingConnection {
 				m.editingConnection = true

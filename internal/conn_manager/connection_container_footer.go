@@ -15,12 +15,13 @@ func editFooter() string {
 }
 
 func normalFooter() string {
-	return fmt.Sprintf("%s, %s, %s, %s, %s, %s, %s",
-		"Connect (enter)",
+	return fmt.Sprintf("%s, %s, %s, %s, %s, %s, %s, %s",
+		"Load tables (enter/space)",
+		"New project (shift+n)",
 		"Edit (e)",
 		"Save (s)",
 		"Navigate (j,k)",
-		"Switch Connections/Projects (tab)",
+		"Switch Projects/Tables (tab)",
 		"Change Mode (m)",
 		"Help (?)",
 	)
