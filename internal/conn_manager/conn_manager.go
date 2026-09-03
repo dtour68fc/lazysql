@@ -392,6 +392,17 @@ func (m ConnectionManager) IsShowingHelp() bool { return m.showHelp }
 // "1" or pressing tab to move between fields would get hijacked instead.
 func (m ConnectionManager) IsEditingConnection() bool { return m.editingConnection }
 
+// IsInTablesDrilldown reports whether the Databases tab is currently
+// showing the tables-of-a-specific-database drill-down - used to gate the
+// global esc "quit the app" shortcut, which must not fire here since esc
+// already means "back out to the database list" in this state.
+func (m ConnectionManager) IsInTablesDrilldown() bool {
+	if list, ok := m.list.(ConnectionList); ok {
+		return list.InTablesDrilldown()
+	}
+	return false
+}
+
 func (m ConnectionManager) handleKeyboardActions(msg tea.Msg) (ConnectionManager, tea.Cmd) {
 	var command tea.Cmd
 	switch msg := msg.(type) {

@@ -154,6 +154,13 @@ func (m ConnectionList) databasesLocked() bool {
 	return m.databasesProjectName == "" && !m.databasesLoading && m.databasesError == ""
 }
 
+// InTablesDrilldown reports whether the Databases tab is currently showing
+// the tables-of-a-specific-database drill-down (as opposed to the flat
+// database list) - used to gate the global esc "quit the app" shortcut,
+// which must not fire here since esc already means "back out to the
+// database list" in this state.
+func (m ConnectionList) InTablesDrilldown() bool { return m.inTables }
+
 func (m ConnectionList) moveSelection(delta int) int {
 	rows := m.projectRows()
 	if len(rows) == 0 {

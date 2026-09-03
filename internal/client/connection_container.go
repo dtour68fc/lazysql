@@ -92,5 +92,18 @@ func (m ConnectionContainerModel) IsEditorCapturingInput() bool {
 	return false
 }
 
+// IsEditorInNormalMode reports whether the editor is in vim's Normal mode
+// specifically - used to gate the global esc/q "quit the app" shortcuts so
+// they never fire while esc or q still mean something to vim itself
+// (leaving Insert/Command mode, or canceling a Visual selection). Defaults
+// to true (safe to quit) if the underlying model isn't the real editor for
+// some reason.
+func (m ConnectionContainerModel) IsEditorInNormalMode() bool {
+	if e, ok := m.editor.(editor.EditorModel); ok {
+		return e.IsInNormalMode()
+	}
+	return true
+}
+
 func (m ConnectionContainerModel) EditorView() string { return m.editor.View() }
 func (m ConnectionContainerModel) ViewerView() string { return m.viewer.View() }

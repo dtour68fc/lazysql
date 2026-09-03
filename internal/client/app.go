@@ -110,6 +110,36 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					*m.connectionContainer = updatedCC
 					return m, tea.Batch(viewCmd, keyCmd)
 				}
+			case "esc":
+				// esc quits, but only where esc doesn't already mean
+				// something more specific: leaving vim's Insert/Visual/
+				// Command mode (editor pane), or backing out of the
+				// Databases tab's tables drill-down (manager pane) - in
+				// both of those cases we fall through to the normal
+				// routing below instead of returning here, so vimtea/
+				// conn_list still get to handle it themselves.
+				switch m.activePane {
+				case "manager":
+					if !m.connectionManager.IsInTablesDrilldown() {
+						return m, tea.Quit
+					}
+				case "editor":
+					if m.connectionContainer == nil || m.connectionContainer.IsEditorInNormalMode() {
+						return m, tea.Quit
+					}
+				case "viewer":
+					return m, tea.Quit
+				}
+			case "q":
+				// q quits, but never while actually typing something -
+				// editingConnection/showHelp are already excluded by
+				// canJumpPanes above, so the only remaining case to guard
+				// is the editor: q is a normal character in Insert mode,
+				// and vimtea uses it as a real command in Visual mode too
+				// (recording macros) - only quit from Normal mode there.
+				if m.activePane != "editor" || m.connectionContainer == nil || m.connectionContainer.IsEditorInNormalMode() {
+					return m, tea.Quit
+				}
 			}
 		}
 	case conn_manager.ConnectedMsg:
@@ -305,7 +335,7 @@ func (m AppModel) buildFooter() string {
 		Padding(0, 1)
 	badge := badgeStyle.Render(badgeLabel)
 
-	universal := "1/2/3: jump pane, tab/shift+tab: cycle panes, ': ' jumps to editor + command mode"
+	universal := "1/2/3: jump pane, tab/shift+tab: cycle panes, ': ' jumps to editor + command mode, esc/q: quit"
 	var specific string
 	switch m.activePane {
 	case "manager":

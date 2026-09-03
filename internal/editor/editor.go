@@ -17,6 +17,15 @@ func (m EditorModel) IsCapturingInput() bool {
 	return mode == vimtea.ModeInsert || mode == vimtea.ModeCommand
 }
 
+// IsInNormalMode reports whether the editor is in vim's Normal mode
+// specifically (not Insert/Visual/Command) - used to gate the global
+// esc/q "quit the app" shortcuts, which must never fire while esc or q
+// still mean something to vim itself (leaving Insert/Command mode, or
+// canceling a Visual selection).
+func (m EditorModel) IsInNormalMode() bool {
+	return m.editor.GetMode() == vimtea.ModeNormal
+}
+
 type EditorModel struct {
 	database     adapters.Database
 	layout       utils.ConnectionContainerLayout
