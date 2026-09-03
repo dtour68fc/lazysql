@@ -97,6 +97,7 @@ func (m EditorModel) Init() tea.Cmd {
 
 func (m EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	handledShorthand := false
 	switch msg := msg.(type) {
 	case utils.ActiveViewChanged:
 		m.isActive = string(msg) == "editor"
@@ -126,10 +127,23 @@ func (m EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if autoRun {
 				cmd = m.runQuery(query)
 			}
+			handledShorthand = true
 		}
 	}
 	newEditor, newCmd := m.editor.Update(msg)
 	m.editor = newEditor.(vimtea.Editor)
+	// vimtea's own CommandMsg handling above still needs to run regardless
+	// (it's what resets the command buffer and drops back to Normal mode)
+	// - but since it never finds our shorthand in ITS OWN command
+	// registry, it always stamps "Unknown command" over the status bar
+	// right after, even when we just successfully handled it ourselves.
+	// Override that back once we know better. SetStatusMessage returns a
+	// tea.Cmd that mutates synchronously the moment it's *called* - call
+	// it directly here instead of batching it, so the override lands
+	// immediately with no visible flicker of "Unknown command" first.
+	if handledShorthand {
+		m.editor.SetStatusMessage("")()
+	}
 	return m, tea.Batch(cmd, newCmd)
 }
 
