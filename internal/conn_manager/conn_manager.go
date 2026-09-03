@@ -40,9 +40,13 @@ type SelectedConnectionMsg adapters.DbConnection
 type EditConnectionMsg bool
 type ConnectionErrorMsg string
 
-// ConnectedMsg signals a successful connection to AppModel.
+// ConnectedMsg signals a successful connection to AppModel. ProjectName is
+// used to label the Tables tab once we're connected - if empty (the "quick
+// connect while editing" shortcut doesn't necessarily have a saved name),
+// a generic label is used instead.
 type ConnectedMsg struct {
-	Database adapters.Database
+	Database    adapters.Database
+	ProjectName string
 }
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
@@ -61,12 +65,16 @@ func setLayout(width int, height int) tea.Cmd {
 func (m ConnectionManager) quickConnectFromForm() tea.Cmd {
 	form := m.form.(ConnectionForm)
 	connection := form.toDbConnection()
+	name := connection.Name
+	if name == "" || name == "New Connection" {
+		name = "Quick Connection"
+	}
 	return func() tea.Msg {
 		database, err := connection.InitConnection()
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to connect: %s", err))
 		}
-		return ConnectedMsg{Database: database}
+		return ConnectedMsg{Database: database, ProjectName: name}
 	}
 }
 
@@ -81,19 +89,34 @@ func (m ConnectionManager) loadTablesForProject(conn adapters.DbConnection) tea.
 		if err != nil {
 			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
 		}
-		databases, err := database.GetDatabases()
-		if err != nil {
-			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
-		}
-		if len(databases) == 0 {
-			return TablesLoadedMsgInternal{ProjectName: conn.Name, Database: database, Tables: nil}
-		}
-		tables, err := database.GetTables(databases[0])
-		if err != nil {
-			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
-		}
-		return TablesLoadedMsgInternal{ProjectName: conn.Name, Database: database, Tables: tables}
+		return fetchTablesMsg(conn.Name, database)
 	}
+}
+
+// fetchTablesForLiveConnection is loadTablesForProject's counterpart for a
+// connection that's already established (e.g. the "quick connect while
+// editing" shortcut) - lists its tables without reconnecting.
+func fetchTablesForLiveConnection(name string, database adapters.Database) tea.Cmd {
+	return func() tea.Msg {
+		return fetchTablesMsg(name, database)
+	}
+}
+
+// fetchTablesMsg does the actual GetDatabases -> GetTables(first) work
+// shared by both connect paths.
+func fetchTablesMsg(name string, database adapters.Database) tea.Msg {
+	databases, err := database.GetDatabases()
+	if err != nil {
+		return TablesErrorMsgInternal{ProjectName: name, Err: err.Error()}
+	}
+	if len(databases) == 0 {
+		return TablesLoadedMsgInternal{ProjectName: name, Database: database, Tables: nil}
+	}
+	tables, err := database.GetTables(databases[0])
+	if err != nil {
+		return TablesErrorMsgInternal{ProjectName: name, Err: err.Error()}
+	}
+	return TablesLoadedMsgInternal{ProjectName: name, Database: database, Tables: tables}
 }
 
 // TablesLoadedMsgInternal / TablesErrorMsgInternal carry the live
@@ -204,6 +227,19 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// this is immediately visible instead of quietly irrelevant.
 		m.connecting = false
 		m.connectionError = ""
+		// Also populate the Tables tab, regardless of which of the two
+		// connect paths got us here (the Projects->Tables preview flow
+		// already does this itself, but the "quick connect while editing"
+		// shortcut never did - you'd end up connected with a live editor,
+		// but Tables staying empty/locked forever since nothing ever told
+		// it what was connected). Reuses the already-live Database - no
+		// need to reconnect just to list its tables.
+		m.activeDatabase = msg.Database
+		m.activeConnectionName = msg.ProjectName
+		loadingMsgCmd := func() tea.Msg {
+			return TablesStateMsg{Loading: true, ProjectName: msg.ProjectName}
+		}
+		command = tea.Batch(loadingMsgCmd, fetchTablesForLiveConnection(msg.ProjectName, msg.Database))
 	case LayoutUpdated:
 		m.layout = utils.ConnectionManagerLayout(msg)
 	case SavedConnectionsLoaded:
@@ -232,8 +268,9 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case OpenActiveConnectionMsg:
 		if m.activeDatabase != nil {
 			db := m.activeDatabase
+			name := m.activeConnectionName
 			command = func() tea.Msg {
-				return ConnectedMsg{Database: db}
+				return ConnectedMsg{Database: db, ProjectName: name}
 			}
 		}
 	}

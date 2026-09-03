@@ -111,7 +111,14 @@ func (m ConnectionList) projectRows() []adapters.DbConnection {
 // true if there are no real connections at all, or no project has been
 // connected + had its tables loaded yet this session.
 func (m ConnectionList) tablesLocked() bool {
-	return !m.hasRealConnections || (m.tablesProjectName == "" && !m.tablesLoading && m.tablesError == "")
+	// Locked until an active connection's tables have actually been loaded
+	// (or are loading, or failed) - regardless of hasRealConnections. That
+	// flag only tracks persisted/SAVED connections, but "quick connect
+	// while editing" never saves anything and can still legitimately load
+	// and populate this tab - hasRealConnections used to gate this too,
+	// which meant a live, table-populated quick-connect stayed locked out
+	// forever just because nothing had been saved to disk.
+	return m.tablesProjectName == "" && !m.tablesLoading && m.tablesError == ""
 }
 
 func (m ConnectionList) moveSelection(delta int) int {
