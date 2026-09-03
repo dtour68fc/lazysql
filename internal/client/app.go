@@ -1,7 +1,6 @@
 package client
 
 import (
-	adapters "app.lazygit/internal/adapters"
 	conn_manager "app.lazygit/internal/conn_manager"
 	utils "app.lazygit/internal/utils"
 	tea "github.com/charmbracelet/bubbletea"
@@ -56,8 +55,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case conn_manager.ConnectedMsg:
-		database := msg.(adapters.Database)
-		m.connectionContainer = InitConnectionContainer(database)
+		m.connectionContainer = InitConnectionContainer(msg.Database, msg.DatabaseName, msg.Tables)
 		m.showingContainer = true
 		return m, m.connectionContainer.Init()
 	}

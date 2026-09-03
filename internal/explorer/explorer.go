@@ -23,19 +23,37 @@ type ExplorerModel struct {
 	layout        utils.ConnectionContainerLayout
 	isActive      bool
 	viewport      viewport.Model
+
+	// preloadedDatabaseName/preloadedTables let the connected screen open
+	// already-expanded to a database whose tables were already fetched
+	// during the Connection Manager's Tables tab preview, instead of
+	// starting fully collapsed and making the user re-navigate to
+	// re-fetch what they just looked at a moment ago.
+	preloadedDatabaseName string
+	preloadedTables       []string
 }
 
 func InitExplorer(database adapters.Database, layout utils.ConnectionContainerLayout) ExplorerModel {
+	return InitExplorerPreloaded(database, layout, "", nil)
+}
+
+// InitExplorerPreloaded is InitExplorer, plus an optional already-known
+// database name and its tables (see ExplorerModel's preloaded* fields).
+// Pass "" / nil when there's nothing preloaded (e.g. connecting via the
+// "quick connect while editing" shortcut, which never previewed anything).
+func InitExplorerPreloaded(database adapters.Database, layout utils.ConnectionContainerLayout, preloadedDatabaseName string, preloadedTables []string) ExplorerModel {
 	list := ExplorerList{}
 	viewport := viewport.New(layout.ExplorerWidth-4, layout.ExplorerHeight-4)
 	list.Initialize()
 	return ExplorerModel{
-		database:      database,
-		databaseError: "",
-		explorerList:  list,
-		layout:        layout,
-		isActive:      true,
-		viewport:      viewport,
+		database:              database,
+		databaseError:         "",
+		explorerList:          list,
+		layout:                layout,
+		isActive:              true,
+		viewport:              viewport,
+		preloadedDatabaseName: preloadedDatabaseName,
+		preloadedTables:       preloadedTables,
 	}
 }
 
@@ -75,6 +93,24 @@ func (m ExplorerModel) expandSelectedNode() tea.Cmd {
 	}
 }
 
+func (m *ExplorerModel) preloadActiveDatabase() {
+	if m.preloadedDatabaseName == "" {
+		return
+	}
+	for i := range m.explorerList.Root.Children {
+		if m.explorerList.Root.Children[i].Title != m.preloadedDatabaseName {
+			continue
+		}
+		m.explorerList.Selected = &m.explorerList.Root.Children[i]
+		var nodes []ExplorerNode
+		for _, table := range m.preloadedTables {
+			nodes = append(nodes, ExplorerNode{Title: table, Type: "table"})
+		}
+		m.explorerList.Expand(nodes)
+		return
+	}
+}
+
 func (m ExplorerModel) createDatabaseList(databases []string) ExplorerList {
 	var nodes []ExplorerNode
 	for _, db := range databases {
@@ -98,6 +134,7 @@ func (m ExplorerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case DatabasesLoaded:
 		m.databaseError = ""
 		m.explorerList = m.createDatabaseList([]string(msg))
+		m.preloadActiveDatabase()
 	case TablesLoaded:
 		m.databaseError = ""
 		var nodes []ExplorerNode

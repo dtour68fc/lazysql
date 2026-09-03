@@ -25,7 +25,12 @@ type ConnectionContainerModel struct {
 	layout      utils.ConnectionContainerLayout
 }
 
-func InitConnectionContainer(database adapters.Database) ConnectionContainerModel {
+// InitConnectionContainer builds the connected 3-pane screen. preloadedDbName
+// and preloadedTables are optional - when set (opened from an already-loaded
+// Tables tab preview in the Connection Manager), Explorer opens with that
+// database already expanded to its tables instead of starting fully
+// collapsed and re-fetching everything the user just previewed a moment ago.
+func InitConnectionContainer(database adapters.Database, preloadedDbName string, preloadedTables []string) ConnectionContainerModel {
 	width, height, err := term.GetSize(int(os.Stdin.Fd()))
 	if err != nil {
 		width = MIN_WIDTH
@@ -34,7 +39,7 @@ func InitConnectionContainer(database adapters.Database) ConnectionContainerMode
 
 	layout := utils.CalculateConnectionContainerLayout(width, height)
 	return ConnectionContainerModel{
-		explorer:    explorer.InitExplorer(database, layout),
+		explorer:    explorer.InitExplorerPreloaded(database, layout, preloadedDbName, preloadedTables),
 		editor:      editor.InitEditor(database, layout),
 		viewer:      viewer.InitViewer(database, layout),
 		active_view: "explorer",

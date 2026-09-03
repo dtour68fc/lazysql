@@ -34,12 +34,25 @@ type ConnectionManager struct {
 	// the user finally opens the full 3-pane screen from the Tables tab.
 	activeDatabase       adapters.Database
 	activeConnectionName string
+	activeDatabaseName   string
+	activeTables         []string
 }
 
 type SelectedConnectionMsg adapters.DbConnection
 type EditConnectionMsg bool
 type ConnectionErrorMsg string
-type ConnectedMsg adapters.Database
+
+// ConnectedMsg signals a successful connection to AppModel. DatabaseName/
+// Tables are only populated when opened from an already-loaded Tables tab
+// preview (see OpenActiveConnectionMsg) - lets Explorer open pre-expanded to
+// that database instead of re-fetching everything from scratch. Empty for
+// the "quick connect while editing the form" path, which never previewed
+// anything first.
+type ConnectedMsg struct {
+	Database     adapters.Database
+	DatabaseName string
+	Tables       []string
+}
 type LayoutUpdated utils.ConnectionManagerLayout
 type SavedConnectionsLoaded map[string]adapters.DbConnection
 type ConnectionsLoaded []adapters.DbConnection
@@ -62,7 +75,7 @@ func (m ConnectionManager) quickConnectFromForm() tea.Cmd {
 		if err != nil {
 			return ConnectionErrorMsg(fmt.Sprintf("Failed to connect: %s", err))
 		}
-		return ConnectedMsg(database)
+		return ConnectedMsg{Database: database}
 	}
 }
 
@@ -88,7 +101,7 @@ func (m ConnectionManager) loadTablesForProject(conn adapters.DbConnection) tea.
 		if err != nil {
 			return TablesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
 		}
-		return TablesLoadedMsgInternal{ProjectName: conn.Name, Database: database, Tables: tables}
+		return TablesLoadedMsgInternal{ProjectName: conn.Name, DatabaseName: databases[0], Database: database, Tables: tables}
 	}
 }
 
@@ -97,9 +110,10 @@ func (m ConnectionManager) loadTablesForProject(conn adapters.DbConnection) tea.
 // cycle concern - it's kept in ConnectionManager instead) alongside the
 // fetch result.
 type TablesLoadedMsgInternal struct {
-	ProjectName string
-	Database    adapters.Database
-	Tables      []string
+	ProjectName  string
+	DatabaseName string
+	Database     adapters.Database
+	Tables       []string
 }
 type TablesErrorMsgInternal struct {
 	ProjectName string
@@ -206,6 +220,8 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TablesLoadedMsgInternal:
 		m.activeDatabase = msg.Database
 		m.activeConnectionName = msg.ProjectName
+		m.activeDatabaseName = msg.DatabaseName
+		m.activeTables = msg.Tables
 		command = func() tea.Msg {
 			return TablesStateMsg{ProjectName: msg.ProjectName, Tables: msg.Tables}
 		}
@@ -216,7 +232,11 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case OpenActiveConnectionMsg:
 		if m.activeDatabase != nil {
 			db := m.activeDatabase
-			command = func() tea.Msg { return ConnectedMsg(db) }
+			dbName := m.activeDatabaseName
+			tables := m.activeTables
+			command = func() tea.Msg {
+				return ConnectedMsg{Database: db, DatabaseName: dbName, Tables: tables}
+			}
 		}
 	}
 
