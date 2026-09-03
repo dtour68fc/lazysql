@@ -153,17 +153,8 @@ func (m ExplorerModel) handleKeyboardActions(msg tea.Msg) (ExplorerModel, tea.Cm
 }
 
 func (m ExplorerModel) View() string {
-	style := lipgloss.
-		NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Width(m.layout.ExplorerWidth - 2).
-		Height(m.layout.ExplorerHeight - 2)
-
-	if m.isActive {
-		style = style.BorderForeground(lipgloss.Color("205"))
-	}
-
-	return style.Render(fmt.Sprintf("%s\n%s", m.viewport.View(), m.databaseError))
+	content := fmt.Sprintf("%s\n%s", m.viewport.View(), m.databaseError)
+	return utils.RenderPanel("1 Explorer", content, m.layout.ExplorerWidth, m.layout.ExplorerHeight, m.isActive)
 }
 
 func (m ExplorerModel) ListNode(node *ExplorerNode, indent int) string {

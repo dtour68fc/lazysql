@@ -6,7 +6,6 @@ import (
 	adapters "app.lazygit/internal/adapters"
 	utils "app.lazygit/internal/utils"
 	tea "github.com/charmbracelet/bubbletea"
-	lipgloss "github.com/charmbracelet/lipgloss"
 )
 
 type ViewerModel struct {
@@ -53,20 +52,11 @@ func (m ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m ViewerModel) View() string {
-	style := lipgloss.
-		NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Width(m.layout.ViewerWidth - 2).
-		Height(m.layout.ViewerHeight - 2)
-
-	if m.isActive {
-		style = style.BorderForeground(lipgloss.Color("205"))
-	}
 	var content string
 	if m.table.HasData() {
 		content = fmt.Sprintf("%s\n", m.table.View())
 	} else {
 		content = m.content
 	}
-	return style.Render(content)
+	return utils.RenderPanel("3 Viewer", content, m.layout.ViewerWidth, m.layout.ViewerHeight, m.isActive)
 }

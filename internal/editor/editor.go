@@ -29,22 +29,32 @@ func InitEditor(database adapters.Database, layout utils.ConnectionContainerLayo
 		vimtea.WithEnableStatusBar(true),
 		vimtea.WithSelectedStyle(lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("255"))),
 	)
-	editor.AddBinding(vimtea.KeyBinding{
-		Key:         "ctrl+r",
-		Mode:        vimtea.ModeVisual,
-		Description: "Run the selected query",
-		VisualHandler: func(text string) tea.Cmd {
-			return func() tea.Msg {
-				rows, err := database.RunQuery(text)
-				if err != nil {
-					return utils.ViewerStringData(lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Render(err.Error()))
-				} else if len(rows) > 0 && len(rows[0]) > 0 {
-					return utils.ViewerTableData(rows)
-				} else {
-					return utils.ViewerStringData(lipgloss.NewStyle().Foreground(lipgloss.Color("34")).Render("Query executed successfully"))
-				}
+	runQuery := func(text string) tea.Cmd {
+		return func() tea.Msg {
+			rows, err := database.RunQuery(text)
+			if err != nil {
+				return utils.ViewerStringData(lipgloss.NewStyle().Foreground(lipgloss.Color("160")).Render(err.Error()))
+			} else if len(rows) > 0 && len(rows[0]) > 0 {
+				return utils.ViewerTableData(rows)
+			} else {
+				return utils.ViewerStringData(lipgloss.NewStyle().Foreground(lipgloss.Color("34")).Render("Query executed successfully"))
 			}
-		},
+		}
+	}
+	editor.AddBinding(vimtea.KeyBinding{
+		Key:           "ctrl+r",
+		Mode:          vimtea.ModeVisual,
+		Description:   "Run the selected query",
+		VisualHandler: func(text string) tea.Cmd { return runQuery(text) },
+	})
+	// ctrl+s runs the WHOLE query buffer, matching LazyCurl's "ctrl+s sends
+	// the request" keybind - no need to visually select the text first like
+	// ctrl+r requires.
+	editor.AddBinding(vimtea.KeyBinding{
+		Key:         "ctrl+s",
+		Mode:        vimtea.ModeNormal,
+		Description: "Run the whole query (like LazyCurl's send-request key)",
+		Handler:     func(buf vimtea.Buffer) tea.Cmd { return runQuery(buf.Text()) },
 	})
 	return EditorModel{
 		database: database,
@@ -77,14 +87,5 @@ func (m EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m EditorModel) View() string {
-	style := lipgloss.
-		NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Width(m.layout.EditorWidth - 2).
-		Height(m.layout.EditorHeight - 2)
-
-	if m.isActive {
-		style = style.BorderForeground(lipgloss.Color("205"))
-	}
-	return style.Render(m.editor.View())
+	return utils.RenderPanel("2 Editor", m.editor.View(), m.layout.EditorWidth, m.layout.EditorHeight, m.isActive)
 }

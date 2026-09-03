@@ -174,6 +174,20 @@ func (m ConnectionContainerModel) View() string {
 }
 
 func (m ConnectionContainerModel) buildFooter() string {
+	// Mode-style badge showing which numbered pane is active, matching
+	// LazyCurl's colored mode badge on the left of the status bar.
+	badgeLabel := map[string]string{
+		"explorer": "1 EXPLORER",
+		"editor":   "2 EDITOR",
+		"viewer":   "3 VIEWER",
+	}[m.active_view]
+	badgeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#1e1e2e")).
+		Background(lipgloss.Color("141")).
+		Bold(true).
+		Padding(0, 1)
+	badge := badgeStyle.Render(badgeLabel)
+
 	universal := "1/2/3: jump pane, tab/shift+tab: cycle, shift+j/k: editor<->viewer"
 	var specific string
 
@@ -181,7 +195,7 @@ func (m ConnectionContainerModel) buildFooter() string {
 	case "explorer":
 		specific = "j/k: up/down, h/l: expand/collapse"
 	case "editor":
-		specific = "ctrl+r: run query"
+		specific = "ctrl+r or ctrl+s: run query"
 	case "viewer":
 		specific = "j/k: rows, h/l: columns"
 	}
@@ -189,7 +203,10 @@ func (m ConnectionContainerModel) buildFooter() string {
 	bindings := fmt.Sprintf("%s | %s", universal, specific)
 	pid := fmt.Sprintf("PID: %d", os.Getpid())
 
-	left := lipgloss.NewStyle().Padding(0, 1).Render(bindings)
+	left := lipgloss.JoinHorizontal(lipgloss.Top,
+		badge,
+		lipgloss.NewStyle().Padding(0, 1).Render(bindings),
+	)
 	right := lipgloss.NewStyle().Padding(0, 1).Render(pid)
 
 	spacerWidth := m.layout.ScreenWidth - lipgloss.Width(left) - lipgloss.Width(right)
