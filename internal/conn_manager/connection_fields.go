@@ -24,10 +24,14 @@ func createDriverInput(value string) textinput.Model {
 }
 
 // driverOption pairs the internal driver value (what adapters.database.go
-// actually accepts) with a friendly display label for the connection form.
+// actually accepts) with a friendly display label for the connection form,
+// plus that driver's conventional default port - prefilled so you don't
+// have to go look up "what port does postgres use again" every time you
+// add a new connection.
 type driverOption struct {
-	Value string
-	Label string
+	Value       string
+	Label       string
+	DefaultPort string
 }
 
 // DriverOptions is the closed set of drivers the app actually supports
@@ -37,9 +41,26 @@ type driverOption struct {
 // of "pgx") used to silently save a connection that could never connect
 // ("unsupported driver: PostgreSQL").
 var DriverOptions = []driverOption{
-	{Value: "pgx", Label: "PostgreSQL"},
-	{Value: "mysql", Label: "MySQL"},
+	{Value: "pgx", Label: "PostgreSQL", DefaultPort: "5432"},
+	{Value: "mysql", Label: "MySQL", DefaultPort: "3306"},
 }
+
+// isDefaultPort reports whether port matches any driver's own default -
+// used to decide whether switching drivers is safe to auto-update the Port
+// field (it was never manually customized to something else) or should
+// leave a real custom port alone.
+func isDefaultPort(port string) bool {
+	if port == "" {
+		return true
+	}
+	for _, opt := range DriverOptions {
+		if opt.DefaultPort == port {
+			return true
+		}
+	}
+	return false
+}
+
 
 // driverIndexForValue returns the DriverOptions index matching the given
 // internal driver value, defaulting to 0 if not found (e.g. empty/new form).

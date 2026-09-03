@@ -34,7 +34,7 @@ func InitConnectionContainer(database adapters.Database, initialQuery string, cu
 	layout := utils.CalculateConnectionContainerLayout(width, height)
 	return ConnectionContainerModel{
 		editor: editor.InitEditor(database, layout, initialQuery, currentTable),
-		viewer: viewer.InitViewer(database, layout),
+		viewer: viewer.InitViewer(database, layout, currentTable),
 		layout: layout,
 	}
 }
@@ -103,6 +103,16 @@ func (m ConnectionContainerModel) IsEditorInNormalMode() bool {
 		return e.IsInNormalMode()
 	}
 	return true
+}
+
+// IsViewerEditingCell reports whether the Viewer's "e" edit-cell modal is
+// currently open - global shortcuts (esc/q to quit, 1/2/3 to jump panes)
+// must not be intercepted while true.
+func (m ConnectionContainerModel) IsViewerEditingCell() bool {
+	if v, ok := m.viewer.(viewer.ViewerModel); ok {
+		return v.IsEditingCell()
+	}
+	return false
 }
 
 func (m ConnectionContainerModel) EditorView() string { return m.editor.View() }

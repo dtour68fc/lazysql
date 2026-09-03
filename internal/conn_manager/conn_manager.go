@@ -197,6 +197,21 @@ func (m ConnectionManager) saveConnection() tea.Cmd {
 	}
 }
 
+// deleteConnection removes a saved connection (pressing "d" on its row in
+// the Projects tab) - persisted to disk and the keyring immediately, same
+// as saving one.
+func (m ConnectionManager) deleteConnection(name string) tea.Cmd {
+	return func() tea.Msg {
+		delete(m.connectionsByName, name)
+		deleteFromKeyring(name)
+		err := saveConnections(m.connectionsByName)
+		if err != nil {
+			return ConnectionErrorMsg(fmt.Sprintf("Failed to delete connection: %s", err))
+		}
+		return SavedConnectionsLoaded(m.connectionsByName)
+	}
+}
+
 // hasRealConnectionsCmd tells the list whether there are any real saved
 // connections, right after they're (re)loaded.
 func hasRealConnectionsCmd(has bool) tea.Cmd {
@@ -285,6 +300,8 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return DatabasesStateMsg{Loading: true, ProjectName: conn.Name}
 		}
 		command = tea.Batch(loadingMsgCmd, m.loadDatabasesForServer(conn))
+	case DeleteConnectionMsg:
+		command = m.deleteConnection(msg.Name)
 	case DatabasesLoadedMsgInternal:
 		m.activeDatabase = msg.Database
 		m.activeConnectionName = msg.ProjectName

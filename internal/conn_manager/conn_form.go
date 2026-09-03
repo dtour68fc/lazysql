@@ -70,7 +70,14 @@ func (m ConnectionForm) setSelectedConnection(conn adapters.DbConnection) Connec
 	m.inputs[0].SetValue(DriverOptions[m.driverIndex].Label)
 	m.inputs[1].SetValue(conn.Name)
 	m.inputs[2].SetValue(conn.Host)
-	m.inputs[3].SetValue(conn.Port)
+	port := conn.Port
+	if port == "" {
+		// New/blank connection - prefill the driver's conventional
+		// default port instead of leaving it empty, so you don't have to
+		// go look up "what port does postgres use again" every time.
+		port = DriverOptions[m.driverIndex].DefaultPort
+	}
+	m.inputs[3].SetValue(port)
 	m.inputs[4].SetValue(conn.Username)
 	m.inputs[5].SetValue(conn.Password)
 	m.inputs[6].SetValue(conn.Url)
@@ -126,12 +133,18 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusIndex == 0 {
 				m.driverIndex = (m.driverIndex - 1 + len(DriverOptions)) % len(DriverOptions)
 				m.inputs[0].SetValue(DriverOptions[m.driverIndex].Label)
+				if isDefaultPort(m.inputs[3].Value()) {
+					m.inputs[3].SetValue(DriverOptions[m.driverIndex].DefaultPort)
+				}
 				return m, nil
 			}
 		case "right", "l":
 			if m.focusIndex == 0 {
 				m.driverIndex = (m.driverIndex + 1) % len(DriverOptions)
 				m.inputs[0].SetValue(DriverOptions[m.driverIndex].Label)
+				if isDefaultPort(m.inputs[3].Value()) {
+					m.inputs[3].SetValue(DriverOptions[m.driverIndex].DefaultPort)
+				}
 				return m, nil
 			}
 		}

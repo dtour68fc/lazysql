@@ -20,6 +20,13 @@ import (
 // has your tables - you see all of them and pick.
 type LoadDatabasesMsg adapters.DbConnection
 
+// DeleteConnectionMsg is sent when the user presses "d" on a project row in
+// the Projects tab - signals ConnectionManager to remove that saved
+// connection (disk + keyring) immediately, no confirmation dialog.
+type DeleteConnectionMsg struct {
+	Name string
+}
+
 // LoadTablesMsg is sent when the user presses space/enter on a specific
 // database row in the (unlocked) Databases tab - signals ConnectionManager
 // to fetch the FULL list of tables in that database (using the connection
@@ -392,6 +399,21 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeTab = "databases"
 			}
 			m.viewport.SetContent(m.contentUI())
+		case "d":
+			// Delete the project (connection) currently hovered in the
+			// Projects tab - no confirmation dialog, matches the rest of
+			// this app's "just do it" style (s saves without asking, e
+			// edits without asking).
+			if m.activeTab == "projects" && m.hasRealConnections {
+				if m.selectedConnectionIndex >= 0 && m.selectedConnectionIndex < len(m.connections) {
+					selected := m.connections[m.selectedConnectionIndex]
+					isPlaceholder := selected.Name == "New Connection" && selected.Host == ""
+					if !isPlaceholder {
+						name := selected.Name
+						cmd = func() tea.Msg { return DeleteConnectionMsg{Name: name} }
+					}
+				}
+			}
 		case "enter", " ", "l", "right":
 			// "l"/"right" are netrw/oil.nvim-style "go into" alternatives
 			// to enter/space - "h"/"left"/esc above is the matching "go

@@ -77,7 +77,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		canJumpPanes := !m.connectionManager.IsEditingConnection() &&
 			!m.connectionManager.IsShowingHelp() &&
-			!(m.activePane == "editor" && m.connectionContainer != nil && m.connectionContainer.IsEditorCapturingInput())
+			!(m.activePane == "editor" && m.connectionContainer != nil && m.connectionContainer.IsEditorCapturingInput()) &&
+			!(m.activePane == "viewer" && m.connectionContainer != nil && m.connectionContainer.IsViewerEditingCell())
 
 		if canJumpPanes {
 			switch msg.String() {
@@ -343,7 +344,7 @@ func (m AppModel) buildFooter() string {
 	case "editor":
 		specific = "ctrl+r or ctrl+s: run query"
 	case "viewer":
-		specific = "j/k: rows, h/l: columns"
+		specific = "j/k: rows, h/l: columns, a: mark row, r: row view, shift+a/shift+d: sort asc/desc, e: edit cell"
 	}
 
 	bindings := fmt.Sprintf("%s | %s", universal, specific)
