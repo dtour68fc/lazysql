@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"app.lazygit/internal/session_manager"
+	"app.lazygit/internal/utils"
 )
 
 type Mysql struct {
@@ -49,11 +50,10 @@ func (m *Mysql) execute(database string, query string, params ...any) (*sql.Rows
 	result, queryErr := m.db.Query(query, params...)
 
 	if queryErr != nil {
-		 m.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v, error: %v", database, query, params, queryErr.Error()))
+		m.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v, error: %v", database, query, params, queryErr.Error()))
 	} else {
-		 m.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v", database, query, params))
+		m.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v", database, query, params))
 	}
-
 
 	if queryErr != nil {
 		return nil, queryErr
@@ -157,7 +157,7 @@ func (m *Mysql) InspectRows(rows *sql.Rows) ([][]string, error) {
 			if val == nil {
 				row[i] = ""
 			} else if b, ok := val.([]byte); ok {
-				row[i] = string(b)
+				row[i] = utils.EncodeByteCell(b)
 			} else {
 				row[i] = fmt.Sprintf("%v", val)
 			}

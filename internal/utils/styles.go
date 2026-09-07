@@ -59,6 +59,13 @@ func TextInputStyle() lipgloss.Style {
 // renderPanel there), so the two apps look the same at a glance and the
 // numbered titles line up with the 1/2/3 window-jump keybindings.
 func RenderPanel(title, content string, width, height int, active bool) string {
+	if width < 4 {
+		width = 4
+	}
+	if height < 2 {
+		height = 2
+	}
+
 	var borderColor lipgloss.Color
 	var titleFg lipgloss.Color
 	if active {
@@ -114,4 +121,3 @@ func RenderPanel(title, content string, width, height int, active bool) string {
 
 	return topBorder + "\n" + borderedContent.String() + bottomBorder
 }
-

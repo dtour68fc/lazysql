@@ -155,7 +155,7 @@ func (m ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			row, col := m.table.SelectedRow, m.table.SelectedColumn
 			current := ""
 			if row >= 0 && row < len(m.table.Rows) && col >= 0 && col < len(m.table.Rows[row]) {
-				current = m.table.Rows[row][col]
+				current = utils.DisplayCell(m.table.Rows[row][col], m.table.RawBytes)
 			}
 			input := textinput.New()
 			input.SetValue(current)

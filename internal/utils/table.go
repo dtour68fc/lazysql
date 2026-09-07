@@ -57,7 +57,8 @@ type Table struct {
 	// vertically as field: value pairs instead of the normal grid - like
 	// psql's \x / expanded display, for rows too wide/many-columned to
 	// read comfortably side-by-side.
-	RowView bool
+	RowView  bool
+	RawBytes bool
 
 	columnWidths []int
 }
@@ -88,11 +89,11 @@ func InitTable(data [][]string, width int, height int) Table {
 		// highlights above (57/60/63), not an unrelated color like orange -
 		// still clearly a different shade so marked vs hovered don't look
 		// identical, without clashing with the rest of the app's palette.
-		MarkedStyle: lipgloss.NewStyle().Background(lipgloss.Color("97")).Foreground(lipgloss.Color("255")),
-		Viewport:    viewport,
-		MarkedRows:          map[int]bool{},
-		MarkedColumns:       map[int]bool{},
-		columnWidths:        calculateColumnWidths(cols, rows),
+		MarkedStyle:   lipgloss.NewStyle().Background(lipgloss.Color("97")).Foreground(lipgloss.Color("255")),
+		Viewport:      viewport,
+		MarkedRows:    map[int]bool{},
+		MarkedColumns: map[int]bool{},
+		columnWidths:  calculateColumnWidths(cols, rows),
 	}
 	content := table.renderColumns() + "\n" + table.renderRows()
 	table.Viewport.SetContent(content)
@@ -144,6 +145,8 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 			}
 		case "r":
 			t.RowView = !t.RowView
+		case "b":
+			t.RawBytes = !t.RawBytes
 		case "A":
 			t.sortByColumn(true)
 		case "D":
@@ -182,9 +185,10 @@ func calculateColumnWidths(cols []string, rows [][]string) []int {
 	}
 	for _, row := range rows {
 		for j, cell := range row {
+			display := DisplayCell(cell, false)
 			widths[j] = slices.Min([]int{
 				MIN_COLUMN_WIDTH,
-				slices.Max([]int{widths[j], len(cell) + 2}),
+				slices.Max([]int{widths[j], len(display) + 2}),
 			})
 		}
 	}
@@ -230,7 +234,8 @@ func (t Table) renderRows() string {
 			case j == t.SelectedColumn:
 				style = style.Inherit(t.SelectedColumnStyle)
 			}
-			columns = append(columns, style.Render(ansi.Truncate(escapeCell(cell), t.columnWidths[j]-2, "…")))
+			display := DisplayCell(cell, t.RawBytes)
+			columns = append(columns, style.Render(ansi.Truncate(escapeCell(display), t.columnWidths[j]-2, "…")))
 		}
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Left, columns...))
 	}
@@ -256,7 +261,8 @@ func (t *Table) sortByColumn(ascending bool) {
 		return
 	}
 	sort.SliceStable(t.Rows, func(i, j int) bool {
-		a, b := t.Rows[i][col], t.Rows[j][col]
+		a := DisplayCell(t.Rows[i][col], t.RawBytes)
+		b := DisplayCell(t.Rows[j][col], t.RawBytes)
 		if less, ok := lessValue(a, b); ok {
 			if ascending {
 				return less
@@ -341,7 +347,7 @@ func (t Table) renderRowView() string {
 			col := t.Columns[colIdx]
 			value := ""
 			if colIdx < len(row) {
-				value = row[colIdx]
+				value = DisplayCell(row[colIdx], t.RawBytes)
 			}
 			lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Top, labelStyle.Render(col+": "), value))
 		}

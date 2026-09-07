@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"app.lazygit/internal/session_manager"
+	"app.lazygit/internal/utils"
 )
 
 type Postgres struct {
@@ -162,6 +163,8 @@ func (p *Postgres) InspectRows(rows *sql.Rows) ([][]string, error) {
 		for i, val := range vals {
 			if val == nil {
 				row[i] = ""
+			} else if b, ok := val.([]byte); ok {
+				row[i] = utils.EncodeByteCell(b)
 			} else {
 				row[i] = fmt.Sprintf("%v", val)
 			}

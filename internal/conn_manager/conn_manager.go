@@ -115,7 +115,7 @@ func (m ConnectionManager) loadDatabasesForServer(conn adapters.DbConnection) te
 		if err != nil {
 			return DatabasesErrorMsgInternal{ProjectName: conn.Name, Err: err.Error()}
 		}
-		return fetchDatabasesMsg(conn.Name, database)
+		return fetchDatabasesMsg(conn.Name, conn.Database, database)
 	}
 }
 
@@ -124,18 +124,18 @@ func (m ConnectionManager) loadDatabasesForServer(conn adapters.DbConnection) te
 // while editing" shortcut) - lists its databases without reconnecting.
 func fetchDatabasesForLiveConnection(name string, database adapters.Database) tea.Cmd {
 	return func() tea.Msg {
-		return fetchDatabasesMsg(name, database)
+		return fetchDatabasesMsg(name, "", database)
 	}
 }
 
 // fetchDatabasesMsg does the actual GetDatabases work shared by both
 // connect paths - the full list, no guessing or filtering.
-func fetchDatabasesMsg(name string, database adapters.Database) tea.Msg {
+func fetchDatabasesMsg(name string, databaseName string, database adapters.Database) tea.Msg {
 	databases, err := database.GetDatabases()
 	if err != nil {
 		return DatabasesErrorMsgInternal{ProjectName: name, Err: err.Error()}
 	}
-	return DatabasesLoadedMsgInternal{ProjectName: name, Database: database, Databases: databases}
+	return DatabasesLoadedMsgInternal{ProjectName: name, DatabaseName: databaseName, Database: database, Databases: databases}
 }
 
 // DatabasesLoadedMsgInternal / DatabasesErrorMsgInternal carry the live
@@ -143,9 +143,10 @@ func fetchDatabasesMsg(name string, database adapters.Database) tea.Msg {
 // cycle concern - it's kept in ConnectionManager instead) alongside the
 // fetch result.
 type DatabasesLoadedMsgInternal struct {
-	ProjectName string
-	Database    adapters.Database
-	Databases   []string
+	ProjectName  string
+	DatabaseName string
+	Database     adapters.Database
+	Databases    []string
 }
 type DatabasesErrorMsgInternal struct {
 	ProjectName string
@@ -411,7 +412,7 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// which of the connect paths fired it, so this doesn't yank you
 		// off the Databases tab you just opened either.
 		connectedCmd := func() tea.Msg {
-			return ConnectedMsg{Database: msg.Database, ProjectName: msg.ProjectName}
+			return ConnectedMsg{Database: msg.Database, ProjectName: msg.ProjectName, DatabaseName: msg.DatabaseName}
 		}
 		// If this load was kicked off to restore last session (see
 		// SessionLoadedMsg/tryRestoreSession above), immediately continue
