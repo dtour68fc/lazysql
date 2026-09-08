@@ -5,7 +5,6 @@ import (
 	"maps"
 	"os"
 	"slices"
-	"time"
 
 	"app.lazygit/internal/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -302,21 +301,6 @@ func loadSessionCmd() tea.Cmd {
 	}
 }
 
-// RetryRestoreMsg fires after retryRestoreInterval to re-attempt
-// reconnecting to the session-restore project named by the string, if
-// it's still the one we're trying to restore (a manual reconnect/pick of
-// a different project in the meantime clears pendingRestoreSession, which
-// this checks against before actually retrying).
-type RetryRestoreMsg string
-
-const retryRestoreInterval = 2 * time.Second
-
-func retryRestoreCmd(projectName string) tea.Cmd {
-	return tea.Tick(retryRestoreInterval, func(time.Time) tea.Msg {
-		return RetryRestoreMsg(projectName)
-	})
-}
-
 // tryRestoreSession kicks off reconnecting to the last-used project (and,
 // once its databases load, opening the last-used table) - guarded so it
 // only ever fires once, and only once BOTH the saved connections and the
@@ -434,8 +418,7 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// leaving pendingRestoreSession set would keep matching this
 			// same project's ProjectName if you ever reconnect to it
 			// again later, uselessly. Don't touch it if this was some
-			// other, unrelated project connecting while a restore for a
-			// DIFFERENT project is still retrying in the background.
+			// other, unrelated project connecting for a normal reason.
 			if m.pendingRestoreSession.ProjectName == msg.ProjectName {
 				m.pendingRestoreSession = SessionState{}
 			}
@@ -444,33 +427,17 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		command = tea.Batch(databasesCmd, connectedCmd, continueCmd)
 	case DatabasesErrorMsgInternal:
 		// If this failure was for the project we're trying to auto-
-		// restore on startup (session.go), don't just give up on the
-		// first failed attempt - the server might just not be reachable
-		// yet this early in boot (slow to come up, network still
-		// settling, etc). Keep retrying on an interval until it actually
-		// connects, instead of silently leaving you on a dead session.
-		isRestoreRetry := m.pendingRestoreSession.ProjectName == msg.ProjectName
-		errMsg := msg.Err
-		if isRestoreRetry {
-			// Say so explicitly - a bare error message here looked
-			// identical to "gave up permanently", with nothing on screen
-			// actually indicating a retry was coming, so it just looked
-			// broken/stuck for the whole interval between attempts.
-			errMsg = fmt.Sprintf("%s (restoring last session, retrying in %s...)", msg.Err, retryRestoreInterval)
+		// restore on startup (session.go), don't keep retrying - a bad
+		// password/host isn't going to start working on its own, and
+		// hammering a real server with repeated failed auth attempts is
+		// actively bad. One attempt: if it fails, just revert to no
+		// connection (the normal disconnected Projects tab), same as if
+		// there'd been no saved session at all.
+		if m.pendingRestoreSession.ProjectName == msg.ProjectName {
+			m.pendingRestoreSession = SessionState{}
 		}
-		errCmd := func() tea.Msg {
-			return DatabasesStateMsg{Err: errMsg, ProjectName: msg.ProjectName}
-		}
-		var retryCmd tea.Cmd
-		if isRestoreRetry {
-			retryCmd = retryRestoreCmd(msg.ProjectName)
-		}
-		command = tea.Batch(errCmd, retryCmd)
-	case RetryRestoreMsg:
-		if m.pendingRestoreSession.ProjectName == string(msg) {
-			if conn, exists := m.connectionsByName[string(msg)]; exists {
-				command = func() tea.Msg { return LoadDatabasesMsg(conn) }
-			}
+		command = func() tea.Msg {
+			return DatabasesStateMsg{Err: msg.Err, ProjectName: msg.ProjectName}
 		}
 	case LoadTablesMsg:
 		if m.activeDatabase != nil {
