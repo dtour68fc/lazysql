@@ -59,6 +59,12 @@ type TablesStateMsg struct {
 	DatabaseName string
 	Tables       []string
 	Err          string
+	// SelectedTable, when non-empty, is which table to pre-select in the
+	// list (matched by name) instead of defaulting to the first row -
+	// used so restoring your last session (or anything else that opens a
+	// specific table programmatically) lands with that exact table
+	// highlighted, not just dumped on whatever's first alphabetically.
+	SelectedTable string
 }
 
 // DumpRequestMsg is sent when the user confirms the destination folder in
@@ -675,12 +681,26 @@ func (m ConnectionList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.inTables = false
 		m.viewport.SetContent(m.contentUI())
 	case TablesStateMsg:
+		// Also make sure the Databases tab is actually the one showing -
+		// this message can arrive without you ever having clicked
+		// through to it yourself (session restore fires it directly),
+		// so the underlying state being ready isn't enough if you're
+		// still visually parked on the Projects tab.
+		m.activeTab = "databases"
 		m.inTables = true
 		m.tablesLoading = msg.Loading
 		m.tablesDatabaseName = msg.DatabaseName
 		m.tables = msg.Tables
 		m.tablesError = msg.Err
 		m.selectedTableIndex = 0
+		if msg.SelectedTable != "" {
+			for i, table := range m.tables {
+				if table == msg.SelectedTable {
+					m.selectedTableIndex = i
+					break
+				}
+			}
+		}
 		m.viewport.SetContent(m.contentUI())
 	case DumpResultMsg:
 		if msg.Err != "" {

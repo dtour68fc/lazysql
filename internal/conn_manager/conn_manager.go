@@ -467,7 +467,8 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// still be active (often the admin db), producing a
 				// baffling "relation X does not exist" for a table that
 				// very much does exist - just not in that database.
-				if _, err := db.GetTables(dbName); err != nil {
+				tables, err := db.GetTables(dbName)
+				if err != nil {
 					return ConnectedMsg{
 						Database:     db,
 						ProjectName:  name,
@@ -475,12 +476,24 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						AutoRunQuery: fmt.Sprintf("-- Failed to switch to database %s: %s", dbName, err),
 					}
 				}
-				return ConnectedMsg{
+				connectedMsg := ConnectedMsg{
 					Database:     db,
 					ProjectName:  name,
 					DatabaseName: dbName,
 					AutoRunQuery: fmt.Sprintf("SELECT * FROM %s;", tableName),
 					Table:        tableName,
+				}
+				// Also sync the Databases tab's own tables list/selection
+				// to match what's actually open - this reuses the
+				// GetTables call above rather than making conn_list fetch
+				// it again separately. Matters most for session restore,
+				// which used to leave the Connection Manager panel
+				// showing nothing about the table it had just silently
+				// opened for you.
+				tablesMsg := TablesStateMsg{DatabaseName: dbName, Tables: tables, SelectedTable: tableName}
+				return tea.BatchMsg{
+					func() tea.Msg { return connectedMsg },
+					func() tea.Msg { return tablesMsg },
 				}
 			}
 		}
