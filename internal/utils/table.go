@@ -124,11 +124,13 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 				t.SelectedRow--
 			}
 		case "a":
-			// Mark/unmark the hovered row AND column, for the multi-select
-			// vertical view ("r") - if no rows are marked when you press
-			// r, it just shows whichever one is currently hovered
-			// instead; same idea for columns, showing every column
-			// instead of just some of them.
+			// Mark/unmark ONLY the hovered row - deliberately doesn't
+			// also touch the column anymore. It used to mark row+column
+			// together, which meant marking several rows in a row while
+			// your cursor stayed on the same column toggled that
+			// column's mark on/off every other press, flickering the
+			// column highlight for no reason you asked for. Use "c" to
+			// mark a column on its own.
 			if len(t.Rows) > 0 {
 				if t.MarkedRows[t.SelectedRow] {
 					delete(t.MarkedRows, t.SelectedRow)
@@ -136,6 +138,9 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 					t.MarkedRows[t.SelectedRow] = true
 				}
 			}
+		case "c":
+			// Mark/unmark ONLY the hovered column - the column
+			// counterpart to "a" above, kept independent on purpose.
 			if len(t.Columns) > 0 {
 				if t.MarkedColumns[t.SelectedColumn] {
 					delete(t.MarkedColumns, t.SelectedColumn)
@@ -148,7 +153,7 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 			// the idea is you've already marked whichever rows you care
 			// about with "a", and just want all of THEIR columns in the
 			// row view instead of marking each column one at a time with
-			// "l"+"a"+"l"+"a"...).
+			// "l"+"c"+"l"+"c"...).
 			for i := range t.Columns {
 				t.MarkedColumns[i] = true
 			}
