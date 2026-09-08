@@ -21,6 +21,7 @@ type AppModel struct {
 	activePane          string                    // "manager" | "editor" | "viewer"
 	width               int
 	height              int
+	theme               themeModal // ctrl+t color editor - see theme_modal.go
 }
 
 func StartApp() {
@@ -28,6 +29,13 @@ func StartApp() {
 }
 
 func initModel() AppModel {
+	// Load any saved color customizations before anything else gets
+	// constructed - ConnectionManager/its list read utils.CurrentTheme at
+	// construction time for their border/selection colors, so this has to
+	// happen first, not lazily inside Init()'s async cmd system.
+	if saved, err := utils.LoadTheme(); err == nil {
+		utils.ApplyTheme(saved)
+	}
 	return AppModel{
 		connectionManager: conn_manager.InitConnectionManager(),
 		activePane:        "manager",
@@ -75,6 +83,20 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+		if m.theme.active {
+			updated, save, cancel := m.theme.update(msg)
+			m.theme = updated
+			if save {
+				newTheme := m.theme.theme()
+				utils.ApplyTheme(newTheme)
+				utils.SaveTheme(newTheme)
+				m.theme = themeModal{}
+			} else if cancel {
+				m.theme = themeModal{}
+			}
+			return m, nil
+		}
+
 		canJumpPanes := !m.connectionManager.IsEditingConnection() &&
 			!m.connectionManager.IsShowingHelp() &&
 			!m.connectionManager.IsDumping() &&
@@ -93,6 +115,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "3":
 				m.activePane = "viewer"
 				return m.applyActiveViewChanged("viewer")
+			case "ctrl+t":
+				// Opens the color scheme editor - a modal full of text
+				// fields (one per customizable color), same shape as
+				// every other modal in this app.
+				m.theme = newThemeModal(utils.CurrentTheme)
+				return m, nil
 			case "tab":
 				return m.cyclePane(1)
 			case "shift+tab":
@@ -277,6 +305,9 @@ func (m AppModel) routeToActivePane(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) View() string {
+	if m.theme.active {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.theme.View())
+	}
 	if m.connectionManager.IsShowingHelp() {
 		return m.connectionManager.View()
 	}
@@ -346,7 +377,7 @@ func (m AppModel) buildFooter() string {
 		Padding(0, 1)
 	badge := badgeStyle.Render(badgeLabel)
 
-	universal := "1/2/3: jump pane, tab/shift+tab: cycle panes, ': ' jumps to editor + command mode, esc/q: quit"
+	universal := "1/2/3: jump pane, tab/shift+tab: cycle panes, ': ' jumps to editor + command mode, ctrl+t: colors, esc/q: quit"
 	var specific string
 	switch m.activePane {
 	case "manager":

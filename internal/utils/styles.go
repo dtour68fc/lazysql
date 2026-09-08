@@ -6,12 +6,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// activeBorderColor / inactiveBorderColor mirror LazyCurl's Lavender/Surface0
-// panel border colors, so a connected LazySQL screen matches LazyCurl's look.
-const (
-	activeBorderColor   = lipgloss.Color("141") // Lavender-ish, matches LazyCurl's active panel accent
-	inactiveBorderColor = lipgloss.Color("240")
-)
+// Border colors used to be fixed constants here (Lavender/Surface0,
+// mirroring LazyCurl's look) - now customizable via CurrentTheme (see
+// theme.go), defaulting to those exact same values (DefaultTheme).
 
 func Border() lipgloss.Style {
 	return lipgloss.NewStyle().
@@ -57,7 +54,8 @@ func TextInputStyle() lipgloss.Style {
 //
 // matching LazyCurl's panel style exactly (see internal/ui/model.go's
 // renderPanel there), so the two apps look the same at a glance and the
-// numbered titles line up with the 1/2/3 window-jump keybindings.
+// numbered titles line up with the 1/2/3 window-jump keybindings. Border
+// colors come from CurrentTheme (see theme.go) - customizable via ctrl+t.
 func RenderPanel(title, content string, width, height int, active bool) string {
 	if width < 4 {
 		width = 4
@@ -69,10 +67,10 @@ func RenderPanel(title, content string, width, height int, active bool) string {
 	var borderColor lipgloss.Color
 	var titleFg lipgloss.Color
 	if active {
-		borderColor = activeBorderColor
-		titleFg = activeBorderColor
+		borderColor = Color(CurrentTheme.BorderActive)
+		titleFg = Color(CurrentTheme.BorderActive)
 	} else {
-		borderColor = inactiveBorderColor
+		borderColor = Color(CurrentTheme.BorderInactive)
 		titleFg = lipgloss.Color("245")
 	}
 

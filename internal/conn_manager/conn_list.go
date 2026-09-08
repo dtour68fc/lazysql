@@ -303,8 +303,8 @@ func (m ConnectionList) projectsUI() string {
 	var lines []string
 	normalStyle := lipgloss.NewStyle().Padding(0, 2)
 	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("57")).
-		Foreground(lipgloss.Color("229")).
+		Background(utils.Color(utils.CurrentTheme.HoverRow)).
+		Foreground(utils.Color(utils.CurrentTheme.HoverFg)).
 		Padding(0, 2)
 
 	var selected adapters.DbConnection
@@ -352,8 +352,8 @@ func (m ConnectionList) databasesUI() string {
 	header := lipgloss.NewStyle().Bold(true).Padding(0, 2).Render(fmt.Sprintf("Databases on %s", m.databasesProjectName))
 	normalStyle := lipgloss.NewStyle().Padding(0, 2)
 	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("57")).
-		Foreground(lipgloss.Color("229")).
+		Background(utils.Color(utils.CurrentTheme.HoverRow)).
+		Foreground(utils.Color(utils.CurrentTheme.HoverFg)).
 		Padding(0, 2)
 
 	lines := []string{header}
@@ -390,8 +390,8 @@ func (m ConnectionList) tablesUI() string {
 
 	normalStyle := lipgloss.NewStyle().Padding(0, 2)
 	selectedStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("57")).
-		Foreground(lipgloss.Color("229")).
+		Background(utils.Color(utils.CurrentTheme.HoverRow)).
+		Foreground(utils.Color(utils.CurrentTheme.HoverFg)).
 		Padding(0, 2)
 
 	lines := []string{header}

@@ -82,14 +82,14 @@ func InitTable(data [][]string, width int, height int) Table {
 		SelectedRow:         0,
 		SelectedColumn:      0,
 		ColumnsStyle:        lipgloss.NewStyle().Bold(true),
-		SelectedRowStyle:    lipgloss.NewStyle().Background(lipgloss.Color("57")).Foreground(lipgloss.Color("229")),
-		SelectedColumnStyle: lipgloss.NewStyle().Background(lipgloss.Color("60")).Foreground(lipgloss.Color("229")),
-		SelectedCellStyle:   lipgloss.NewStyle().Background(lipgloss.Color("63")).Foreground(lipgloss.Color("229")),
+		SelectedRowStyle:    lipgloss.NewStyle().Background(Color(CurrentTheme.HoverRow)).Foreground(Color(CurrentTheme.HoverFg)),
+		SelectedColumnStyle: lipgloss.NewStyle().Background(Color(CurrentTheme.HoverColumn)).Foreground(Color(CurrentTheme.HoverFg)),
+		SelectedCellStyle:   lipgloss.NewStyle().Background(Color(CurrentTheme.HoverCell)).Foreground(Color(CurrentTheme.HoverFg)),
 		// A different shade of the same purple/blue family as the hover
 		// highlights above (57/60/63), not an unrelated color like orange -
 		// still clearly a different shade so marked vs hovered don't look
 		// identical, without clashing with the rest of the app's palette.
-		MarkedStyle:   lipgloss.NewStyle().Background(lipgloss.Color("97")).Foreground(lipgloss.Color("255")),
+		MarkedStyle:   lipgloss.NewStyle().Background(Color(CurrentTheme.Marked)).Foreground(Color(CurrentTheme.MarkedFg)),
 		Viewport:      viewport,
 		MarkedRows:    map[int]bool{},
 		MarkedColumns: map[int]bool{},
