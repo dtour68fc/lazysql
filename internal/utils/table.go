@@ -256,19 +256,31 @@ func calculateColumnWidths(cols []string, rows [][]string) []int {
 }
 
 func (t Table) renderColumns() string {
+	allColsMarked := t.AllColumnsMarked()
 	var columns []string
 	for i, col := range t.Columns {
 		style := t.ColumnsStyle.
 			Width(t.columnWidths[i]).
 			Padding(0, 1, 0, 1)
 
-		if t.MarkedColumns[i] {
+		switch {
+		case allColsMarked && i == t.SelectedColumn:
+			// Same exception as the body rows: with every column marked,
+			// "marked" stops meaning anything per-column, so let hover
+			// win here too so you can still tell where your cursor is.
+			style = style.Inherit(t.SelectedColumnStyle)
+		case t.MarkedColumns[i]:
+			// Marked wins in the HEADER specifically, regardless of
+			// hover - this is the one place a marked column shows up
+			// no matter where your row cursor currently sits. In the
+			// data rows below, hover still wins at any actual
+			// intersection (you need to see where your cursor is), which
+			// meant marking a column you were already hovering (or
+			// hovering the SAME row as) gave zero visible feedback until
+			// you moved to a different row to see it - the header now
+			// gives you that confirmation immediately instead.
 			style = style.Inherit(t.MarkedStyle)
-		}
-		if i == t.SelectedColumn {
-			// Hover takes precedence over marked - you should always be
-			// able to see where your cursor actually is, even on a
-			// column you've also marked.
+		case i == t.SelectedColumn:
 			style = style.Inherit(t.SelectedColumnStyle)
 		}
 		columns = append(columns, style.Render(col))
