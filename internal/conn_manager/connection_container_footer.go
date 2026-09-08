@@ -2,6 +2,8 @@ package conn_manager
 
 import (
 	"fmt"
+
+	utils "app.lazygit/internal/utils"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -32,7 +34,7 @@ func normalFooter() string {
 }
 
 func errorFooter(errorMessage string) string {
-	error_message := lipgloss.NewStyle().Foreground(lipgloss.Color("161")).Render(errorMessage)
+	error_message := lipgloss.NewStyle().Foreground(utils.Color(utils.CurrentTheme.ErrorFg)).Render(errorMessage)
 	return fmt.Sprintf("%s\n%s", error_message, "Press 'e' to edit connection details.")
 }
 

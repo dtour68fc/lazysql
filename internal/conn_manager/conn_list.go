@@ -301,7 +301,7 @@ func (m ConnectionList) projectsUI() string {
 	}
 
 	var lines []string
-	normalStyle := lipgloss.NewStyle().Padding(0, 2)
+	normalStyle := utils.MaybeForeground(lipgloss.NewStyle().Padding(0, 2), utils.CurrentTheme.TextFg)
 	selectedStyle := lipgloss.NewStyle().
 		Background(utils.Color(utils.CurrentTheme.HoverRow)).
 		Foreground(utils.Color(utils.CurrentTheme.HoverFg)).
@@ -340,7 +340,7 @@ func (m ConnectionList) databasesUI() string {
 	}
 
 	if m.databasesError != "" {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("161")).Padding(1, 2).Render(
+		return lipgloss.NewStyle().Foreground(utils.Color(utils.CurrentTheme.ErrorFg)).Padding(1, 2).Render(
 			fmt.Sprintf("Failed to load databases for %s:\n%s", m.databasesProjectName, m.databasesError),
 		)
 	}
@@ -350,7 +350,7 @@ func (m ConnectionList) databasesUI() string {
 	}
 
 	header := lipgloss.NewStyle().Bold(true).Padding(0, 2).Render(fmt.Sprintf("Databases on %s", m.databasesProjectName))
-	normalStyle := lipgloss.NewStyle().Padding(0, 2)
+	normalStyle := utils.MaybeForeground(lipgloss.NewStyle().Padding(0, 2), utils.CurrentTheme.TextFg)
 	selectedStyle := lipgloss.NewStyle().
 		Background(utils.Color(utils.CurrentTheme.HoverRow)).
 		Foreground(utils.Color(utils.CurrentTheme.HoverFg)).
@@ -377,7 +377,7 @@ func (m ConnectionList) tablesUI() string {
 	}
 
 	if m.tablesError != "" {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("161")).Padding(1, 2).Render(
+		return lipgloss.NewStyle().Foreground(utils.Color(utils.CurrentTheme.ErrorFg)).Padding(1, 2).Render(
 			fmt.Sprintf("Failed to load tables for %s:\n%s\n\nesc/h: back", m.tablesDatabaseName, m.tablesError),
 		)
 	}
@@ -388,7 +388,7 @@ func (m ConnectionList) tablesUI() string {
 		return lipgloss.JoinVertical(lipgloss.Left, header, empty)
 	}
 
-	normalStyle := lipgloss.NewStyle().Padding(0, 2)
+	normalStyle := utils.MaybeForeground(lipgloss.NewStyle().Padding(0, 2), utils.CurrentTheme.TextFg)
 	selectedStyle := lipgloss.NewStyle().
 		Background(utils.Color(utils.CurrentTheme.HoverRow)).
 		Foreground(utils.Color(utils.CurrentTheme.HoverFg)).

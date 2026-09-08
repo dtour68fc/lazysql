@@ -21,6 +21,9 @@ type Theme struct {
 	HoverFg        string // Foreground text color for all of the above
 	Marked         string // Viewer: marked (not hovered) rows/columns background - "a" to mark
 	MarkedFg       string // Foreground text color for marked rows/columns
+	TextFg         string // Normal (non-highlighted) text color - empty means "leave it at the terminal's default", same as before this existed
+	ErrorFg        string // Error messages (failed connections/queries/dumps/imports, etc)
+	SuccessFg      string // Success messages (e.g. "Query executed successfully")
 }
 
 // DefaultTheme is exactly what every color already was before this became
@@ -36,7 +39,20 @@ func DefaultTheme() Theme {
 		HoverFg:        "229",
 		Marked:         "97",
 		MarkedFg:       "255",
+		TextFg:         "",
+		ErrorFg:        "161",
+		SuccessFg:      "34",
 	}
+}
+
+// MaybeForeground applies a Foreground color to style only if value is
+// non-empty - used for TextFg, where empty deliberately means "leave the
+// terminal's own default text color alone" rather than forcing a color.
+func MaybeForeground(style lipgloss.Style, value string) lipgloss.Style {
+	if value == "" {
+		return style
+	}
+	return style.Foreground(Color(value))
 }
 
 // ThemeFieldNames returns the display label for each Theme field, in the
@@ -52,14 +68,20 @@ func ThemeFieldNames() []string {
 		"Hover text",
 		"Marked",
 		"Marked text",
+		"Normal text (blank = terminal default)",
+		"Error text",
+		"Success text",
 	}
 }
 
-// ThemeFieldValues/SetThemeFieldValues let the modal read/write all 8
+// ThemeFieldValues/ThemeFromFieldValues let the modal read/write all
 // fields generically (as a slice, matching ThemeFieldNames' order) instead
 // of hand-wiring each one.
 func (t Theme) ThemeFieldValues() []string {
-	return []string{t.BorderActive, t.BorderInactive, t.HoverRow, t.HoverColumn, t.HoverCell, t.HoverFg, t.Marked, t.MarkedFg}
+	return []string{
+		t.BorderActive, t.BorderInactive, t.HoverRow, t.HoverColumn, t.HoverCell, t.HoverFg,
+		t.Marked, t.MarkedFg, t.TextFg, t.ErrorFg, t.SuccessFg,
+	}
 }
 
 func ThemeFromFieldValues(values []string) Theme {
@@ -78,8 +100,12 @@ func ThemeFromFieldValues(values []string) Theme {
 		HoverFg:        get(5),
 		Marked:         get(6),
 		MarkedFg:       get(7),
+		TextFg:         get(8),
+		ErrorFg:        get(9),
+		SuccessFg:      get(10),
 	}
 }
+
 
 // CurrentTheme is what every color-consuming render function (RenderPanel,
 // Table's styles, ConnectionList's selection styles) actually reads at

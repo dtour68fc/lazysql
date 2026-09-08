@@ -81,7 +81,7 @@ func InitTable(data [][]string, width int, height int) Table {
 		Rows:                rows,
 		SelectedRow:         0,
 		SelectedColumn:      0,
-		ColumnsStyle:        lipgloss.NewStyle().Bold(true),
+		ColumnsStyle:        MaybeForeground(lipgloss.NewStyle().Bold(true), CurrentTheme.TextFg),
 		SelectedRowStyle:    lipgloss.NewStyle().Background(Color(CurrentTheme.HoverRow)).Foreground(Color(CurrentTheme.HoverFg)),
 		SelectedColumnStyle: lipgloss.NewStyle().Background(Color(CurrentTheme.HoverColumn)).Foreground(Color(CurrentTheme.HoverFg)),
 		SelectedCellStyle:   lipgloss.NewStyle().Background(Color(CurrentTheme.HoverCell)).Foreground(Color(CurrentTheme.HoverFg)),
@@ -221,7 +221,7 @@ func (t Table) renderRows() string {
 	for i, row := range t.Rows {
 		var columns []string
 		for j, cell := range row {
-			style := lipgloss.NewStyle().Width(t.columnWidths[j]).Padding(0, 1, 0, 1)
+			style := MaybeForeground(lipgloss.NewStyle().Width(t.columnWidths[j]).Padding(0, 1, 0, 1), CurrentTheme.TextFg)
 			marked := t.MarkedRows[i] || t.MarkedColumns[j]
 			hovered := i == t.SelectedRow || j == t.SelectedColumn
 			switch {
