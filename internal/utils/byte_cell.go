@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 const byteCellPrefix = "\x00lazysql-byte:"
@@ -12,12 +13,22 @@ func EncodeByteCell(value []byte) string {
 	return byteCellPrefix + base64.StdEncoding.EncodeToString(value) + "\x00" + string(value)
 }
 
+// DisplayCell renders a byte column's value. When rawBytes is false (the
+// default), it only shows the naive text cast if the underlying bytes are
+// actually valid UTF-8 - genuinely binary data (protobuf/avro-framed
+// payloads, etc) instead shows a plain "<binary, N bytes>" placeholder
+// rather than the garbled mix of readable-and-garbage characters you get
+// from printing arbitrary bytes as if they were text. rawBytes=true always
+// shows the explicit numeric byte array regardless, for either case.
 func DisplayCell(value string, rawBytes bool) string {
 	raw, text, ok := decodeByteCell(value)
 	if !ok {
 		return value
 	}
 	if !rawBytes {
+		if !utf8.Valid(raw) {
+			return fmt.Sprintf("<binary, %d bytes>", len(raw))
+		}
 		return text
 	}
 
