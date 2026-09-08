@@ -245,14 +245,20 @@ func (t Table) renderRows() string {
 		for j, cell := range row {
 			style := MaybeForeground(lipgloss.NewStyle().Width(t.columnWidths[j]).Padding(0, 1, 0, 1), CurrentTheme.TextFg)
 			marked := t.MarkedRows[i] || t.MarkedColumns[j]
-			hovered := i == t.SelectedRow || j == t.SelectedColumn
 			switch {
 			case i == t.SelectedRow && j == t.SelectedColumn:
+				// Exact hovered cell always wins - this is literally
+				// where the cursor is, has to stay visible regardless
+				// of anything else going on in this row/column.
 				style = style.Inherit(t.SelectedCellStyle)
-			case marked && !hovered:
-				style = style.Inherit(t.MarkedStyle)
 			case i == t.SelectedRow:
+				// Hovered row also still wins over marked - same reason.
 				style = style.Inherit(t.SelectedRowStyle)
+			case marked:
+				// Marked now supersedes hover column specifically - a
+				// marked row shouldn't lose its color just because the
+				// cursor's column happens to pass through it.
+				style = style.Inherit(t.MarkedStyle)
 			case j == t.SelectedColumn:
 				style = style.Inherit(t.SelectedColumnStyle)
 			}

@@ -1,13 +1,13 @@
 {
   "BorderActive": "#7aa2f7",
   "BorderInactive": "#414868",
-  "HoverRow": "#283457",
-  "HoverColumn": "#3b4261",
-  "HoverCell": "#545c7e",
+  "HoverRow": "#565f89",
+  "HoverColumn": "#33467c",
+  "HoverCell": "#7aa2f7",
   "HoverFg": "#c0caf5",
-  "Marked": "#bb9af7",
-  "MarkedFg": "#1a1b26",
-  "TextFg": "#c0caf5",
+  "Marked": "#7dcfff",
+  "MarkedFg": "#565f89",
+  "TextFg": "#ffffff",
   "ErrorFg": "#f7768e",
   "SuccessFg": "#9ece6a"
 }
