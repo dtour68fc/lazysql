@@ -455,6 +455,26 @@ func (m ConnectionManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tableName := msg.TableName
 			saveSession(SessionState{ProjectName: name, DatabaseName: dbName, TableName: tableName})
 			command = func() tea.Msg {
+				// Ensure the connection is actually pointed at dbName
+				// before running the auto-query below. Normal navigation
+				// (Databases tab -> pick a database -> its tables load)
+				// already does this as a side effect of GetTables, but
+				// OpenTableMsg can also get fired directly - session
+				// restore does exactly that, skipping straight from
+				// "connected to the project" to "open this table" with
+				// no GetTables call in between. Without this, the query
+				// silently ran against whatever database happened to
+				// still be active (often the admin db), producing a
+				// baffling "relation X does not exist" for a table that
+				// very much does exist - just not in that database.
+				if _, err := db.GetTables(dbName); err != nil {
+					return ConnectedMsg{
+						Database:     db,
+						ProjectName:  name,
+						Table:        tableName,
+						AutoRunQuery: fmt.Sprintf("-- Failed to switch to database %s: %s", dbName, err),
+					}
+				}
 				return ConnectedMsg{
 					Database:     db,
 					ProjectName:  name,
