@@ -91,6 +91,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				utils.ApplyTheme(newTheme)
 				utils.SaveTheme(newTheme)
 				m.theme = themeModal{}
+				// Panel borders already read CurrentTheme live on every
+				// render, but the Viewer's table styles are fixed at
+				// construction time - without this, a table already on
+				// screen wouldn't pick up the new colors until its next
+				// query ran.
+				if m.connectionContainer != nil {
+					updatedCC, cmd := m.connectionContainer.Update(utils.ThemeChangedMsg{})
+					*m.connectionContainer = updatedCC
+					return m, cmd
+				}
 			} else if cancel {
 				m.theme = themeModal{}
 			}

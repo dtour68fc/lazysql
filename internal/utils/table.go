@@ -178,6 +178,28 @@ func (t Table) HasData() bool {
 	return len(t.Columns) > 0 && len(t.Rows) > 0
 }
 
+// RefreshStyles rebuilds every theme-derived style field from whatever
+// CurrentTheme is right now - everything else (Rows, Columns, selection
+// state, marks, RowView, etc) is left untouched. InitTable only reads the
+// theme once at construction time, so a table that was already on screen
+// when you changed colors in the ctrl+t editor wouldn't otherwise reflect
+// the new colors until its next query ran - this lets AppModel force that
+// refresh immediately on save instead.
+func (t Table) RefreshStyles() Table {
+	t.ColumnsStyle = MaybeForeground(lipgloss.NewStyle().Bold(true), CurrentTheme.TextFg)
+	t.SelectedRowStyle = lipgloss.NewStyle().Background(Color(CurrentTheme.HoverRow)).Foreground(Color(CurrentTheme.HoverFg))
+	t.SelectedColumnStyle = lipgloss.NewStyle().Background(Color(CurrentTheme.HoverColumn)).Foreground(Color(CurrentTheme.HoverFg))
+	t.SelectedCellStyle = lipgloss.NewStyle().Background(Color(CurrentTheme.HoverCell)).Foreground(Color(CurrentTheme.HoverFg))
+	t.MarkedStyle = lipgloss.NewStyle().Background(Color(CurrentTheme.Marked)).Foreground(Color(CurrentTheme.MarkedFg))
+	return t
+}
+
+// ThemeChangedMsg is broadcast app-wide the moment the ctrl+t color editor
+// saves, so anything holding onto styles computed at construction time
+// (see RefreshStyles above) gets a chance to rebuild them immediately
+// instead of waiting for its next natural re-render/data reload.
+type ThemeChangedMsg struct{}
+
 func calculateColumnWidths(cols []string, rows [][]string) []int {
 	widths := make([]int, len(cols))
 	for i, col := range cols {

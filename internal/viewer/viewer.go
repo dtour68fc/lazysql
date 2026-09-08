@@ -141,6 +141,8 @@ func (m ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.content = ""
 	case utils.ActiveViewChanged:
 		m.isActive = string(msg) == "viewer"
+	case utils.ThemeChangedMsg:
+		m.table = m.table.RefreshStyles()
 	case utils.LayoutUpdated:
 		m.layout = utils.ConnectionContainerLayout(msg)
 	case cellUpdatedMsg:
