@@ -1,0 +1,13 @@
+{
+  "BorderActive": "141",
+  "BorderInactive": "240",
+  "HoverRow": "57",
+  "HoverColumn": "60",
+  "HoverCell": "63",
+  "HoverFg": "229",
+  "Marked": "97",
+  "MarkedFg": "255",
+  "TextFg": "",
+  "ErrorFg": "161",
+  "SuccessFg": "34"
+}

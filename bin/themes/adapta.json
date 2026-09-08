@@ -1,0 +1,13 @@
+{
+  "BorderActive": "#00bcd4",
+  "BorderInactive": "#505050",
+  "HoverRow": "#991199",
+  "HoverColumn": "#00bcd4",
+  "HoverCell": "#ff0040",
+  "HoverFg": "#ffffff",
+  "Marked": "#55bcea",
+  "MarkedFg": "#ffffff",
+  "TextFg": "#cfd8dc",
+  "ErrorFg": "#ff0040",
+  "SuccessFg": "#00bcd4"
+}

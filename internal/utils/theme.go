@@ -2,8 +2,11 @@ package utils
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -168,3 +171,70 @@ func SaveTheme(t Theme) error {
 // Color is a tiny convenience wrapper so callers don't need to import
 // lipgloss just to turn a Theme string field into a usable color.
 func Color(value string) lipgloss.Color { return lipgloss.Color(value) }
+
+// NamedTheme pairs a bundled preset's display name (its filename minus
+// ".json") with its parsed Theme.
+type NamedTheme struct {
+	Name  string
+	Theme Theme
+}
+
+// BundledThemes is the app's built-in color scheme presets (default,
+// adapta, tokyo-night, ...) - baked into the binary via go:embed (see
+// themes_embed.go at the repo root) and populated once at startup via
+// LoadBundledThemes, before anything reads it. The ctrl+t modal's preset
+// selector cycles through this list with h/l.
+var BundledThemes []NamedTheme
+
+// themeNamePriority pins the order presets show up in when cycling,
+// regardless of alphabetical filename order - "default" first since it's
+// what you land on with nothing customized, then whatever else in
+// whatever order they were added. Anything not listed here just falls in
+// afterward, alphabetically.
+var themeNamePriority = []string{"default", "adapta", "tokyo-night"}
+
+// LoadBundledThemes parses every *.json file in themesFS (an embedded
+// directory of preset Theme values) into BundledThemes. Safe to call with
+// an fs that doesn't exist or is empty - BundledThemes just stays empty
+// and the preset selector has nothing to cycle through, rather than
+// crashing the whole app over a packaging mistake.
+func LoadBundledThemes(themesFS fs.FS) error {
+	entries, err := fs.ReadDir(themesFS, ".")
+	if err != nil {
+		return err
+	}
+	var loaded []NamedTheme
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		data, err := fs.ReadFile(themesFS, entry.Name())
+		if err != nil {
+			continue
+		}
+		var t Theme
+		if err := json.Unmarshal(data, &t); err != nil {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".json")
+		loaded = append(loaded, NamedTheme{Name: name, Theme: t})
+	}
+	sort.SliceStable(loaded, func(i, j int) bool {
+		pi, pj := themeNamePriorityIndex(loaded[i].Name), themeNamePriorityIndex(loaded[j].Name)
+		if pi != pj {
+			return pi < pj
+		}
+		return loaded[i].Name < loaded[j].Name
+	})
+	BundledThemes = loaded
+	return nil
+}
+
+func themeNamePriorityIndex(name string) int {
+	for i, n := range themeNamePriority {
+		if n == name {
+			return i
+		}
+	}
+	return len(themeNamePriority) // unlisted names sort after all pinned ones
+}
