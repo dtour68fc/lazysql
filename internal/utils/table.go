@@ -124,13 +124,17 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 				t.SelectedRow--
 			}
 		case "a":
-			// Mark/unmark ONLY the hovered row - deliberately doesn't
-			// also touch the column anymore. It used to mark row+column
-			// together, which meant marking several rows in a row while
-			// your cursor stayed on the same column toggled that
-			// column's mark on/off every other press, flickering the
-			// column highlight for no reason you asked for. Use "c" to
-			// mark a column on its own.
+			// Mark/unmark the hovered row AND column together - this is
+			// the main workflow: select one cell (e.g. one specific id),
+			// press "r" and see just that value instead of the whole
+			// row. Toggling both at once briefly got split into "a"
+			// (row-only) + "c" (column-only) to avoid a column mark
+			// flip-flopping when marking several DIFFERENT rows in a
+			// row while the cursor stayed on the same column - but that
+			// traded away the actual everyday single-cell-select
+			// workflow, which matters more. Use "c" on its own if you
+			// specifically want to add more columns without touching
+			// row marks.
 			if len(t.Rows) > 0 {
 				if t.MarkedRows[t.SelectedRow] {
 					delete(t.MarkedRows, t.SelectedRow)
@@ -138,9 +142,17 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 					t.MarkedRows[t.SelectedRow] = true
 				}
 			}
+			if len(t.Columns) > 0 {
+				if t.MarkedColumns[t.SelectedColumn] {
+					delete(t.MarkedColumns, t.SelectedColumn)
+				} else {
+					t.MarkedColumns[t.SelectedColumn] = true
+				}
+			}
 		case "c":
-			// Mark/unmark ONLY the hovered column - the column
-			// counterpart to "a" above, kept independent on purpose.
+			// Mark/unmark ONLY the hovered column, without touching row
+			// marks - an additive tool for widening which columns show
+			// in the row view beyond whatever "a" already selected.
 			if len(t.Columns) > 0 {
 				if t.MarkedColumns[t.SelectedColumn] {
 					delete(t.MarkedColumns, t.SelectedColumn)
