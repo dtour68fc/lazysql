@@ -143,6 +143,15 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 					t.MarkedColumns[t.SelectedColumn] = true
 				}
 			}
+		case "ctrl+a":
+			// Marks every column at once (leaves MarkedRows untouched -
+			// the idea is you've already marked whichever rows you care
+			// about with "a", and just want all of THEIR columns in the
+			// row view instead of marking each column one at a time with
+			// "l"+"a"+"l"+"a"...).
+			for i := range t.Columns {
+				t.MarkedColumns[i] = true
+			}
 		case "r":
 			t.RowView = !t.RowView
 		case "b":
