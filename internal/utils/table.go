@@ -149,13 +149,19 @@ func (t Table) Update(msg tea.Msg) (Table, tea.Cmd) {
 				}
 			}
 		case "ctrl+a":
-			// Marks every column at once (leaves MarkedRows untouched -
-			// the idea is you've already marked whichever rows you care
-			// about with "a", and just want all of THEIR columns in the
-			// row view instead of marking each column one at a time with
-			// "l"+"c"+"l"+"c"...).
-			for i := range t.Columns {
-				t.MarkedColumns[i] = true
+			// Toggles marking every column at once (leaves MarkedRows
+			// untouched - the idea is you've already marked whichever
+			// rows you care about with "a", and just want all of THEIR
+			// columns in the row view instead of marking each column one
+			// at a time with "l"+"c"+"l"+"c"...). Pressing it again while
+			// every column is already marked clears them all back out,
+			// rather than being a one-way door.
+			if t.AllColumnsMarked() {
+				t.MarkedColumns = map[int]bool{}
+			} else {
+				for i := range t.Columns {
+					t.MarkedColumns[i] = true
+				}
 			}
 		case "r":
 			t.RowView = !t.RowView
@@ -181,8 +187,26 @@ func (t Table) renderContent() string {
 	if t.RowView {
 		return t.renderRowView()
 	}
+	if t.AllColumnsMarked() {
+		banner := lipgloss.NewStyle().Faint(true).Italic(true).Render("[all columns marked - hover column shown instead of marked color; ctrl+a again toggles, r shows every marked row]")
+		return banner + "\n" + t.renderColumns() + "\n" + t.renderRows()
+	}
 	return t.renderColumns() + "\n" + t.renderRows()
 }
+
+// AllColumnsMarked reports whether every column is currently marked (e.g.
+// via ctrl+a) - in that state, "marked" stops carrying useful per-column
+// information (it'd paint every row the same color), so hover column
+// takes precedence back over it instead (see renderRows), and this banner
+// makes that mode visible so it doesn't look like marking silently
+// stopped working.
+func (t Table) AllColumnsMarked() bool {
+	if len(t.Columns) == 0 {
+		return false
+	}
+	return len(t.MarkedColumns) == len(t.Columns)
+}
+
 
 func (t Table) View() string {
 	return t.Viewport.View()
@@ -253,6 +277,7 @@ func (t Table) renderColumns() string {
 }
 
 func (t Table) renderRows() string {
+	allColsMarked := t.AllColumnsMarked()
 	var rows []string
 	for i, row := range t.Rows {
 		var columns []string
@@ -268,6 +293,14 @@ func (t Table) renderRows() string {
 			case i == t.SelectedRow:
 				// Hovered row also still wins over marked - same reason.
 				style = style.Inherit(t.SelectedRowStyle)
+			case allColsMarked && j == t.SelectedColumn:
+				// With every column marked, "marked" stops carrying any
+				// per-column information - it'd just paint entire rows
+				// uniformly and hide where your cursor's column actually
+				// is. Let hover column win here specifically so you can
+				// still see it (see the "all columns marked" banner in
+				// renderContent for the flip side of this).
+				style = style.Inherit(t.SelectedColumnStyle)
 			case marked:
 				// Marked now supersedes hover column specifically - a
 				// marked row shouldn't lose its color just because the
