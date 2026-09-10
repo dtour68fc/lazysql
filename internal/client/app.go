@@ -186,12 +186,19 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case conn_manager.ConnectedMsg:
 		cc := InitConnectionContainer(msg.Database, msg.AutoRunQuery, msg.Table)
 		m.connectionContainer = &cc
-		// Never yank focus onto the editor just because a connection
-		// succeeded (whether that's picking a project, opening a table,
-		// or quick-connecting from the form) - the editor/viewer go live
-		// in the background, but you stay wherever you already were and
-		// jump over yourself with 2/tab whenever you're ready.
+		// Opening a SPECIFIC table (msg.Table set) jumps straight to the
+		// Viewer (pane 3) so you immediately see its results without an
+		// extra "3" press - that's the whole point of picking a table.
+		// Just connecting to a PROJECT (no specific table yet, e.g. the
+		// Databases tab landing you there, or the quick-connect-while-
+		// editing shortcut) still doesn't yank focus - the editor/viewer
+		// go live in the background, but you stay wherever you already
+		// were and jump over yourself with 2/3/tab whenever you're ready.
 		nextPane := m.activePane
+		if msg.Table != "" {
+			nextPane = "viewer"
+		}
+		m.activePane = nextPane
 		var sizeCmd tea.Cmd
 		if m.width > 0 {
 			updated, cmd := m.connectionContainer.Update(tea.WindowSizeMsg{Width: m.rightWidth(), Height: m.bodyHeight()})
