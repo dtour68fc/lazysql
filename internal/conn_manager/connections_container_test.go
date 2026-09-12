@@ -23,8 +23,21 @@ func TestGetConnections(t *testing.T) {
 	}
 
 	configPath := filepath.Join(tempDir, "lazysql", "connections.json")
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	info, err := os.Stat(configPath)
+	if os.IsNotExist(err) {
 		t.Error("Expected connections.json to be created")
+	}
+	if got := info.Mode().Perm(); got != configFilePerm {
+		t.Errorf("Expected connections.json permissions %o, got %o", configFilePerm, got)
+	}
+
+	configDir := filepath.Dir(configPath)
+	info, err = os.Stat(configDir)
+	if err != nil {
+		t.Fatalf("Expected lazysql config dir to exist: %v", err)
+	}
+	if got := info.Mode().Perm(); got != configDirPerm {
+		t.Errorf("Expected lazysql config dir permissions %o, got %o", configDirPerm, got)
 	}
 
 	content := `{"test": {"Name": "test", "Host": "localhost"}}`
@@ -71,6 +84,18 @@ func TestSaveConnections(t *testing.T) {
 	err := saveConnections(connections)
 	if err != nil {
 		t.Fatalf("saveConnections failed: %v", err)
+	}
+
+	configPath, err := getConnectionsFilePath()
+	if err != nil {
+		t.Fatalf("getConnectionsFilePath failed: %v", err)
+	}
+	info, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("Expected connections.json to exist: %v", err)
+	}
+	if got := info.Mode().Perm(); got != configFilePerm {
+		t.Errorf("Expected connections.json permissions %o, got %o", configFilePerm, got)
 	}
 
 	saved, err := getConnections()

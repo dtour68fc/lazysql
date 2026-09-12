@@ -84,7 +84,7 @@ func (m ConnectionForm) setSelectedConnection(conn adapters.DbConnection) Connec
 	m.inputs[7].SetValue(conn.Command)
 	m.inputs[8].SetValue(conn.Database)
 
-	if conn.Command != "" {
+	if conn.Command != "" && adapters.CommandConnectionsEnabled() {
 		m.mode = "command"
 	} else if conn.Url != "" {
 		m.mode = "url"
@@ -120,7 +120,7 @@ func (m ConnectionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Password - they just don't show up in url/command mode at
 			// all (see getVisibleIndices), and there was no way out.
 			if m.focusIndex == -1 || m.focusIndex == 0 {
-				if m.mode == "credentials" {
+				if m.mode == "credentials" && adapters.CommandConnectionsEnabled() {
 					m.mode = "command"
 				} else if m.mode == "command" {
 					m.mode = "url"
@@ -220,7 +220,7 @@ func (m ConnectionForm) getVisibleIndices() []int {
 		indices = append(indices, 2, 3, 4, 5)
 	} else if m.mode == "url" {
 		indices = append(indices, 6)
-	} else if m.mode == "command" {
+	} else if m.mode == "command" && adapters.CommandConnectionsEnabled() {
 		indices = append(indices, 7)
 	}
 	// Database (index 8) is always visible, same as Driver/Name, regardless
@@ -273,6 +273,11 @@ func (m ConnectionForm) changeFocusIndex(key string) int {
 }
 
 func (m ConnectionForm) toDbConnection() adapters.DbConnection {
+	command := ""
+	if adapters.CommandConnectionsEnabled() {
+		command = m.inputs[7].Value()
+	}
+
 	return adapters.DbConnection{
 		Driver:   DriverOptions[m.driverIndex].Value,
 		Name:     m.inputs[1].Value(),
@@ -281,7 +286,7 @@ func (m ConnectionForm) toDbConnection() adapters.DbConnection {
 		Username: m.inputs[4].Value(),
 		Password: m.inputs[5].Value(),
 		Url:      m.inputs[6].Value(),
-		Command:  m.inputs[7].Value(),
+		Command:  command,
 		Database: m.inputs[8].Value(),
 	}
 }

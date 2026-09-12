@@ -48,6 +48,8 @@ func TestDbConnectionString(t *testing.T) {
 	})
 
 	t.Run("connection string from command", func(t *testing.T) {
+		t.Setenv("LAZYSQL_ENABLE_COMMANDS", "1")
+
 		tmpDir := t.TempDir()
 		scriptPath := filepath.Join(tmpDir, "test-script.sh")
 		err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nprintf 'cmdhost\tcmduser\tcmdpass\t9999'"), 0755)
@@ -68,6 +70,8 @@ func TestDbConnectionString(t *testing.T) {
 
 func TestCollectCredentialsFromCommand(t *testing.T) {
 	t.Run("valid command output", func(t *testing.T) {
+		t.Setenv("LAZYSQL_ENABLE_COMMANDS", "1")
+
 		tmpDir := t.TempDir()
 		scriptPath := filepath.Join(tmpDir, "test-script.sh")
 		err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nprintf 'h\tu\tp\t1234'"), 0755)
@@ -88,6 +92,8 @@ func TestCollectCredentialsFromCommand(t *testing.T) {
 	})
 
 	t.Run("invalid command output", func(t *testing.T) {
+		t.Setenv("LAZYSQL_ENABLE_COMMANDS", "1")
+
 		tmpDir := t.TempDir()
 		scriptPath := filepath.Join(tmpDir, "test-script.sh")
 		err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nprintf 'only\tthree\tparts'"), 0755)
@@ -105,12 +111,24 @@ func TestCollectCredentialsFromCommand(t *testing.T) {
 	})
 
 	t.Run("command execution failure", func(t *testing.T) {
+		t.Setenv("LAZYSQL_ENABLE_COMMANDS", "1")
+
 		c := &DbConnection{
 			Command: "nonexistent-command-12345",
 		}
 		err := c.collectCredentialsFromCommand()
 		if err == nil {
 			t.Error("expected error for nonexistent command, got nil")
+		}
+	})
+
+	t.Run("disabled by default", func(t *testing.T) {
+		c := &DbConnection{
+			Command: "echo h\tu\tp\t1234",
+		}
+		err := c.collectCredentialsFromCommand()
+		if err == nil {
+			t.Error("expected error when command connections are disabled")
 		}
 	})
 }

@@ -23,6 +23,13 @@ func TestSessionManager_PresentLogic(t *testing.T) {
 	if _, err := os.Stat(sessionsDir); os.IsNotExist(err) {
 		t.Error("Expected getSessionsDir to create the directory")
 	}
+	info, err := os.Stat(sessionsDir)
+	if err != nil {
+		t.Fatalf("Expected sessions directory to exist: %v", err)
+	}
+	if got := info.Mode().Perm(); got != sessionDirPerm {
+		t.Errorf("Expected sessions directory permissions %o, got %o", sessionDirPerm, got)
+	}
 
 	// 2. Test getCreatedSessions logic
 	// Create a mock session log file

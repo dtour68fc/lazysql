@@ -51,12 +51,7 @@ func (p *Postgres) execute(database string, query string, params ...any) (*sql.R
 	}
 
 	result, queryErr := p.db.Query(query, params...)
-
-	if queryErr != nil {
-		p.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v, error: %v", database, query, params, queryErr.Error()))
-	} else {
-		p.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v", database, query, params))
-	}
+	p.sessionManager.CurrentSession().CreateLog(formatQueryLog(database, query, params, queryErr))
 
 	if queryErr != nil {
 		return nil, queryErr

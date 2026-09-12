@@ -36,6 +36,13 @@ func TestCurrentSession(t *testing.T) {
 	if strings.TrimSpace(string(data)) != logContent {
 		t.Errorf("Expected content %q, got %q", logContent, string(data))
 	}
+	info, err := os.Stat(cs.sessionFilePath)
+	if err != nil {
+		t.Fatalf("Failed to stat log file: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Errorf("Expected log file permissions 0600, got %o", got)
+	}
 
 	// 3. Test CreateLog (appending)
 	secondEntry := "Second log entry"

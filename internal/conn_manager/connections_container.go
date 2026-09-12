@@ -12,6 +12,8 @@ import (
 
 const (
 	keyringService = "lazysql"
+	configDirPerm  = 0700
+	configFilePerm = 0600
 )
 
 func saveConnections(connections map[string]adapters.DbConnection) error {
@@ -51,7 +53,7 @@ func saveConnections(connections map[string]adapters.DbConnection) error {
 		return err
 	}
 
-	err = os.WriteFile(connectionsPath, connectionsJson, 0644)
+	err = os.WriteFile(connectionsPath, connectionsJson, configFilePerm)
 	if err != nil {
 		return err
 	}
@@ -118,8 +120,8 @@ func readConnectionsFile() ([]byte, error) {
 		if os.IsNotExist(fileErr) {
 			fileErr = nil
 			lazysqlConfigDir := filepath.Dir(connectionsPath)
-			os.MkdirAll(lazysqlConfigDir, os.ModePerm)
-			os.WriteFile(connectionsPath, []byte("{}"), 0644)
+			os.MkdirAll(lazysqlConfigDir, configDirPerm)
+			os.WriteFile(connectionsPath, []byte("{}"), configFilePerm)
 			fileContent, fileErr = os.ReadFile(connectionsPath)
 		} else {
 			return fileContent, fileErr

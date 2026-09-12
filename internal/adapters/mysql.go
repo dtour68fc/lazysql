@@ -48,12 +48,7 @@ func (m *Mysql) execute(database string, query string, params ...any) (*sql.Rows
 	}
 
 	result, queryErr := m.db.Query(query, params...)
-
-	if queryErr != nil {
-		m.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v, error: %v", database, query, params, queryErr.Error()))
-	} else {
-		m.sessionManager.CurrentSession().CreateLog(fmt.Sprintf("Executing query on database '%s': %s, params: %v", database, query, params))
-	}
+	m.sessionManager.CurrentSession().CreateLog(formatQueryLog(database, query, params, queryErr))
 
 	if queryErr != nil {
 		return nil, queryErr

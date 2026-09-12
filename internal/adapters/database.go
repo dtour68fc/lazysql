@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	"database/sql"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // connectTimeout bounds how long InitConnection's health-check query is
@@ -19,6 +20,11 @@ import (
 // with no error at all - the underlying database/sql query had no
 // context/deadline on it whatsoever.
 const connectTimeout = 8 * time.Second
+
+func CommandConnectionsEnabled() bool {
+	value := strings.ToLower(os.Getenv("LAZYSQL_ENABLE_COMMANDS"))
+	return value == "1" || value == "true" || value == "yes"
+}
 
 type DbConnection struct {
 	Name     string
@@ -96,6 +102,10 @@ func (c *DbConnection) InitConnection() (Database, error) {
 	var db *sql.DB
 	var err error
 
+	if c.Command != "" && !CommandConnectionsEnabled() {
+		return nil, fmt.Errorf("command connections are disabled; set LAZYSQL_ENABLE_COMMANDS=1 to opt in")
+	}
+
 	database, err := c.healthCheckDatabase()
 	if err != nil {
 		return nil, err
@@ -128,6 +138,10 @@ func (c *DbConnection) InitConnection() (Database, error) {
 }
 
 func (c *DbConnection) collectCredentialsFromCommand() error {
+	if !CommandConnectionsEnabled() {
+		return fmt.Errorf("command connections are disabled; set LAZYSQL_ENABLE_COMMANDS=1 to opt in")
+	}
+
 	out, err := exec.Command(c.Command).Output()
 	if err != nil {
 		return err

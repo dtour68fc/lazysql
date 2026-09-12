@@ -35,14 +35,14 @@ func saveSession(s SessionState) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(sessionPath), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(sessionPath), configDirPerm); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(sessionPath, data, 0644)
+	return os.WriteFile(sessionPath, data, configFilePerm)
 }
 
 // loadSession returns the zero SessionState (not an error) if there's no

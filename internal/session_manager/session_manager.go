@@ -9,6 +9,10 @@ import (
 	"syscall"
 )
 
+const (
+	sessionDirPerm = 0700
+)
+
 type SessionManager struct {
 	configDir      string
 	sessionsDir    string
@@ -69,7 +73,7 @@ func (s *SessionManager) getSessionsDir() string {
 	}
 	sessionsDir := filepath.Join(s.getConfigDir(), "lazysql", "sessions")
 	if _, err := os.Stat(sessionsDir); os.IsNotExist(err) {
-		os.MkdirAll(sessionsDir, 0755)
+		os.MkdirAll(sessionsDir, sessionDirPerm)
 	}
 	s.sessionsDir = sessionsDir
 	return s.sessionsDir
